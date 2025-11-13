@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CryptoTrader</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="strategies">Strategies</string>
+    <string name="market">Market</string>
+    <string name="history">History</string>
+    <string name="settings">Settings</string>
+</resources>

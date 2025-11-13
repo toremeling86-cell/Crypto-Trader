@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.kraken.com</domain>
+        <domain includeSubdomains="true">ws.kraken.com</domain>
+        <domain includeSubdomains="true">api.anthropic.com</domain>
+    </domain-config>
+
+    <!-- Trust user-installed CAs for development only -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

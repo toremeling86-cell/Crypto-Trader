@@ -1,0 +1,136 @@
+CRYPTOTRADER - TERMS OF SERVICE AND RISK DISCLOSURE
+
+LAST UPDATED: November 2025
+
+================================================================================
+IMPORTANT - READ CAREFULLY BEFORE USING THIS APPLICATION
+================================================================================
+
+By using CryptoTrader, you acknowledge and agree to these terms.
+
+1. CRYPTOCURRENCY TRADING RISKS
+
+WARNING: Cryptocurrency trading involves SUBSTANTIAL RISK OF LOSS and is not suitable for everyone. You should carefully consider whether trading is appropriate for you in light of your experience, objectives, financial resources, and other relevant circumstances.
+
+The HIGH DEGREE OF LEVERAGE available in cryptocurrency markets can work against you as well as for you. The use of leverage can lead to large losses as well as gains.
+
+PAST PERFORMANCE IS NOT INDICATIVE OF FUTURE RESULTS. The strategies used by this application have not been validated by independent third parties and may fail to perform as expected.
+
+2. NO FINANCIAL ADVICE
+
+CryptoTrader is a software tool only and does NOT provide financial, investment, tax, or legal advice. The automated trading strategies are provided "AS IS" without any warranty of profitability or suitability for your circumstances.
+
+You are solely responsible for:
+- Evaluating the risks and benefits of trading
+- Determining appropriate position sizes
+- Setting stop-loss levels
+- Monitoring your account
+- Complying with applicable laws and regulations
+
+3. NO GUARANTEE OF PROFIT
+
+There is NO GUARANTEE that you will make money using this application. In fact, most retail traders lose money. You should only trade with funds you can afford to lose entirely.
+
+4. AUTOMATED TRADING RISKS
+
+Automated trading systems carry additional risks:
+- Software bugs may cause unexpected behavior
+- API connection issues may prevent timely order execution
+- Strategy parameters may become outdated
+- Market conditions may change rapidly
+- Exchange outages may prevent trade execution
+
+You MUST monitor your automated trading system regularly. Never rely solely on automation.
+
+5. PAPER TRADING vs LIVE TRADING
+
+Paper trading (simulated trading) does NOT accurately reflect live trading conditions:
+- No slippage or execution delays
+- No emotional factors
+- May not account for fees accurately
+- May simulate market conditions inaccurately
+
+Success in paper trading does NOT guarantee success in live trading.
+
+6. EXCHANGE RISKS
+
+All trades are executed through Kraken exchange. You acknowledge:
+- Kraken may experience outages, limiting functionality
+- Kraken may change API terms without notice
+- Your Kraken account security is your responsibility
+- Kraken may impose trading restrictions
+- Exchange hacks or failures may result in loss of funds
+
+7. API KEY SECURITY
+
+You are responsible for:
+- Securely storing your API keys
+- Using appropriate API key permissions (trade only, no withdrawals)
+- Monitoring API key usage
+- Revoking keys if compromised
+
+NEVER share your API keys with anyone. This application stores keys encrypted locally but cannot guarantee absolute security.
+
+8. LIABILITY DISCLAIMER
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW:
+
+CryptoTrader and its developers ARE NOT LIABLE for:
+- Any losses resulting from use of this application
+- Bugs, errors, or malfunctions
+- Third-party service failures (Kraken, internet, etc.)
+- Loss of data or inability to access the application
+- Any indirect, incidental, or consequential damages
+
+YOU USE THIS APPLICATION ENTIRELY AT YOUR OWN RISK.
+
+9. NO WARRANTY
+
+This application is provided "AS IS" and "AS AVAILABLE" without warranties of any kind, either express or implied, including but not limited to:
+- Merchantability
+- Fitness for a particular purpose
+- Non-infringement
+- Error-free operation
+- Security
+
+10. REGULATORY COMPLIANCE
+
+You are solely responsible for compliance with:
+- Local securities laws
+- Tax reporting requirements
+- Anti-money laundering (AML) regulations
+- Know Your Customer (KYC) requirements
+
+Cryptocurrency regulations vary by jurisdiction. Consult a legal professional.
+
+11. MODIFICATIONS
+
+These terms may be updated at any time. Continued use of the application after changes constitutes acceptance of new terms.
+
+12. TERMINATION
+
+You may stop using this application at any time. We reserve the right to discontinue the application without notice.
+
+13. INDEMNIFICATION
+
+You agree to indemnify and hold harmless the developers from any claims, losses, or damages arising from your use of this application.
+
+14. AGE REQUIREMENT
+
+You must be at least 18 years old (or the age of majority in your jurisdiction) to use this application.
+
+15. ACCEPTANCE
+
+By clicking "I Accept" you confirm that:
+✓ You have read and understood these terms
+✓ You accept all risks associated with cryptocurrency trading
+✓ You understand that you may lose all funds
+✓ You will only trade with funds you can afford to lose
+✓ You are legally permitted to trade in your jurisdiction
+✓ You are of legal age
+
+================================================================================
+IF YOU DO NOT ACCEPT THESE TERMS, DO NOT USE THIS APPLICATION
+================================================================================
+
+Contact: For support, visit https://github.com/cryptotrader (EXAMPLE ONLY)
