@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import com.cryptotrader.presentation.screens.chat.ChatScreen
 import com.cryptotrader.presentation.screens.dashboard.DashboardScreen
 import com.cryptotrader.presentation.screens.disclaimer.DisclaimerScreen
+import com.cryptotrader.presentation.screens.portfolio.PortfolioScreen
 import com.cryptotrader.presentation.screens.setup.ApiKeySetupScreen
 import com.cryptotrader.presentation.screens.settings.SettingsScreen
 import com.cryptotrader.presentation.screens.strategy.StrategyConfigScreen
@@ -15,6 +16,7 @@ sealed class Screen(val route: String) {
     object Disclaimer : Screen("disclaimer")
     object ApiSetup : Screen("api_setup")
     object Dashboard : Screen("dashboard")
+    object Portfolio : Screen("portfolio")
     object Strategy : Screen("strategy")
     object Settings : Screen("settings")
     object Chat : Screen("chat")
@@ -51,6 +53,10 @@ fun NavGraph(
 
         composable(Screen.Dashboard.route) {
             DashboardScreen()
+        }
+
+        composable(Screen.Portfolio.route) {
+            PortfolioScreen()
         }
 
         composable(Screen.Strategy.route) {

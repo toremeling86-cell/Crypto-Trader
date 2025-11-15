@@ -1,21 +1,32 @@
 package com.cryptotrader.presentation.screens.dashboard
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cryptotrader.domain.model.Trade
+import com.cryptotrader.presentation.theme.profit
+import com.cryptotrader.presentation.theme.loss
+import com.cryptotrader.presentation.theme.warning
 import com.cryptotrader.utils.formatCurrency
 import com.cryptotrader.utils.formatTimeAgo
 
+/**
+ * Professional Wall Street-Level Dashboard
+ * Clean, sophisticated design without emojis or amateur aesthetics
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel()
@@ -24,227 +35,319 @@ fun DashboardScreen(
     val recentTrades by viewModel.recentTrades.collectAsState()
     val activeStrategies by viewModel.activeStrategies.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
-    // Don't cache paper trading mode - read it fresh each time so it updates when changed in Settings
     val isPaperTrading = com.cryptotrader.utils.CryptoUtils.isPaperTradingMode(context)
+    val isEmergencyStopped = com.cryptotrader.utils.CryptoUtils.isEmergencyStopActive(context)
+    var showStopConfirmDialog by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Dashboard",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            IconButton(onClick = viewModel::refresh) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Paper Trading Banner
-        if (isPaperTrading) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFFFA500) // Orange
+    // Emergency Stop Confirmation Dialog
+    if (showStopConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showStopConfirmDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "📄 PAPER TRADING MODE",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Trading with simulated money - No real funds at risk",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        // Trading Status Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = if (state.isTradingActive) Color(0xFF4CAF50) else Color(0xFF9E9E9E)
-            )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = if (state.isTradingActive) "🟢 LIVE TRADING ACTIVE" else "⚪ TRADING STOPPED",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                    )
-                    Text(
-                        text = if (state.isTradingActive)
-                            "Checking ${activeStrategies.size} strategies every minute"
-                        else
-                            "Click START to begin automated trading",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-                Button(
-                    onClick = {
-                        if (state.isTradingActive) {
-                            viewModel.stopTrading()
-                        } else {
-                            viewModel.startTrading()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (state.isTradingActive) Color.Red else Color.Green
-                    )
-                ) {
-                    Text(
-                        text = if (state.isTradingActive) "STOP" else "START",
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Emergency Stop Button
-        // Don't cache emergency stop status - read it fresh each time
-        val isEmergencyStopped = com.cryptotrader.utils.CryptoUtils.isEmergencyStopActive(context)
-        var showStopConfirmDialog by remember { mutableStateOf(false) }
-
-        if (showStopConfirmDialog) {
-            AlertDialog(
-                onDismissRequest = { showStopConfirmDialog = false },
-                title = { Text("🚨 EMERGENCY STOP") },
-                text = {
-                    Text("This will IMMEDIATELY:\n\n• Disable all active strategies\n• Stop all automated trading\n\nAre you sure?")
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.activateEmergencyStop()
-                            showStopConfirmDialog = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                    ) {
-                        Text("STOP ALL TRADING")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showStopConfirmDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-
-        if (isEmergencyStopped) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.Red)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "🚨 EMERGENCY STOP ACTIVE",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "All automated trading is HALTED",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = { viewModel.deactivateEmergencyStop() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                    ) {
-                        Text("Resume Trading", color = Color.Red)
-                    }
-                }
-            }
-        } else {
-            Button(
-                onClick = { showStopConfirmDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-            ) {
+            },
+            title = {
                 Text(
-                    text = "🚨 EMERGENCY STOP ALL TRADING",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    "EMERGENCY STOP",
+                    fontWeight = FontWeight.Bold
                 )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        when {
-            state.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            state.errorMessage != null -> {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
+            },
+            text = {
+                Text(
+                    "This will immediately:\n\n" +
+                    "• Disable all active strategies\n" +
+                    "• Stop all automated trading\n" +
+                    "• Require manual resume\n\n" +
+                    "Are you sure?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                FilledTonalButton(
+                    onClick = {
+                        viewModel.activateEmergencyStop()
+                        showStopConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
                 ) {
-                    Text(
-                        text = state.errorMessage!!,
-                        modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
+                    Text("Stop All Trading", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Dashboard", fontWeight = FontWeight.SemiBold) },
+                actions = {
+                    IconButton(onClick = viewModel::refresh) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+
+            // Paper Trading Mode Indicator - Professional Design
+            if (isPaperTrading) {
+                item {
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.warning),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.warning.copy(alpha = 0.08f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.warning,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "PAPER TRADING MODE",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.warning
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Simulated trading • No real funds at risk",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            else -> {
-                // Portfolio Card
-                state.portfolio?.let { portfolio ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
+            // Trading Status - Professional Design with LED Indicator
+            item {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Total Portfolio Value",
-                                style = MaterialTheme.typography.bodyMedium
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Professional LED Status Indicator
+                            Canvas(modifier = Modifier.size(12.dp)) {
+                                drawCircle(
+                                    color = if (state.isTradingActive)
+                                        androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                                    else
+                                        androidx.compose.ui.graphics.Color(0xFF9E9E9E)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = if (state.isTradingActive) "LIVE TRADING" else "TRADING PAUSED",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (state.isTradingActive)
+                                        "${activeStrategies.size} active strategies"
+                                    else
+                                        "Start to enable automation",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                if (state.isTradingActive) {
+                                    viewModel.stopTrading()
+                                } else {
+                                    viewModel.startTrading()
+                                }
+                            },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (state.isTradingActive)
+                                    MaterialTheme.colorScheme.errorContainer
+                                else
+                                    MaterialTheme.colorScheme.primaryContainer
                             )
+                        ) {
+                            Icon(
+                                imageVector = if (state.isTradingActive) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (state.isTradingActive) "Stop" else "Start",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Emergency Stop - Professional Design
+            item {
+                if (isEmergencyStopped) {
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.error),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(40.dp)
+                            )
+                            Text(
+                                text = "EMERGENCY STOP ACTIVE",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "All automated trading halted",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            FilledTonalButton(
+                                onClick = { viewModel.deactivateEmergencyStop() },
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                )
+                            ) {
+                                Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Resume Trading", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { showStopConfirmDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "EMERGENCY STOP",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+
+            // Loading State
+            if (state.isLoading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+
+            // Error State
+            state.errorMessage?.let { error ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            text = error,
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+
+            // Portfolio Summary Card - Professional Design
+            state.portfolio?.let { portfolio ->
+                item {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text(
+                                text = "Portfolio Value",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = portfolio.totalValue.formatCurrency(),
-                                style = MaterialTheme.typography.headlineLarge
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Bold
                             )
 
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Divider()
                             Spacer(modifier = Modifier.height(16.dp))
 
                             // Total P&L
@@ -255,19 +358,29 @@ fun DashboardScreen(
                                 Column {
                                     Text(
                                         text = "Total P&L",
-                                        style = MaterialTheme.typography.bodyMedium
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = portfolio.totalProfit.formatCurrency(),
                                         style = MaterialTheme.typography.titleLarge,
-                                        color = if (portfolio.totalProfit >= 0) Color.Green else Color.Red
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (portfolio.totalProfit >= 0)
+                                            MaterialTheme.colorScheme.profit
+                                        else
+                                            MaterialTheme.colorScheme.loss
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
                                         text = String.format("%.2f%%", portfolio.totalProfitPercent),
                                         style = MaterialTheme.typography.titleLarge,
-                                        color = if (portfolio.totalProfit >= 0) Color.Green else Color.Red
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (portfolio.totalProfit >= 0)
+                                            MaterialTheme.colorScheme.profit
+                                        else
+                                            MaterialTheme.colorScheme.loss
                                     )
                                 }
                             }
@@ -282,76 +395,96 @@ fun DashboardScreen(
                                 Column {
                                     Text(
                                         text = "Today's P&L",
-                                        style = MaterialTheme.typography.bodySmall
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = portfolio.dayProfit.formatCurrency(),
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (portfolio.dayProfit >= 0) Color.Green else Color.Red
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (portfolio.dayProfit >= 0)
+                                            MaterialTheme.colorScheme.profit
+                                        else
+                                            MaterialTheme.colorScheme.loss
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
                                         text = String.format("%.2f%%", portfolio.dayProfitPercent),
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (portfolio.dayProfit >= 0) Color.Green else Color.Red
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (portfolio.dayProfit >= 0)
+                                            MaterialTheme.colorScheme.profit
+                                        else
+                                            MaterialTheme.colorScheme.loss
                                     )
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Active Strategies
+            // Active Strategies Section
+            item {
                 Text(
-                    text = "Active Strategies (${activeStrategies.size})",
-                    style = MaterialTheme.typography.titleMedium
+                    text = "Active Strategies",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+            }
 
-                if (activeStrategies.isEmpty()) {
-                    Text(
-                        text = "No active strategies",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(0.4f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (activeStrategies.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
-                        items(activeStrategies) { strategy ->
-                            StrategyCard(strategy = strategy)
-                        }
+                        Text(
+                            text = "No active strategies",
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
+            } else {
+                items(activeStrategies) { strategy ->
+                    StrategyCard(strategy = strategy)
+                }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Recent Trades
+            // Recent Trades Section
+            item {
                 Text(
                     text = "Recent Trades",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+            }
 
-                if (recentTrades.isEmpty()) {
-                    Text(
-                        text = "No trades yet",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(0.6f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (recentTrades.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
-                        items(recentTrades.take(10)) { trade ->
-                            TradeCard(trade = trade)
-                        }
+                        Text(
+                            text = "No trades yet",
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
+                }
+            } else {
+                items(recentTrades.take(10)) { trade ->
+                    TradeCard(trade = trade)
                 }
             }
         }
@@ -360,42 +493,145 @@ fun DashboardScreen(
 
 @Composable
 fun StrategyCard(strategy: com.cryptotrader.domain.model.Strategy) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = strategy.name, style = MaterialTheme.typography.titleSmall)
-            Text(
-                text = "${strategy.totalTrades} trades | ${String.format("%.1f%%", strategy.winRate)} win rate",
-                style = MaterialTheme.typography.bodySmall
-            )
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Professional status indicator
+                    Canvas(modifier = Modifier.size(10.dp)) {
+                        drawCircle(
+                            color = if (strategy.isActive)
+                                androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                            else
+                                androidx.compose.ui.graphics.Color(0xFF9E9E9E)
+                        )
+                    }
+                    Text(
+                        text = strategy.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "Trades",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = strategy.totalTrades.toString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Win Rate",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = String.format("%.1f%%", strategy.winRate),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = if (strategy.winRate >= 50.0)
+                            MaterialTheme.colorScheme.profit
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                if (strategy.totalProfit != 0.0) {
+                    Column {
+                        Text(
+                            text = "P&L",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = strategy.totalProfit.formatCurrency(),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = if (strategy.totalProfit >= 0)
+                                MaterialTheme.colorScheme.profit
+                            else
+                                MaterialTheme.colorScheme.loss
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 fun TradeCard(trade: Trade) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "${trade.type} ${trade.pair}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (trade.type.name == "BUY") Color.Green else Color.Red
-                )
-                Text(
-                    text = trade.timestamp.formatTimeAgo(),
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Professional side indicator
+                Canvas(modifier = Modifier.size(8.dp)) {
+                    drawCircle(
+                        color = if (trade.type.name == "BUY")
+                            androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                        else
+                            androidx.compose.ui.graphics.Color(0xFFE57373)
+                    )
+                }
+                Column {
+                    Text(
+                        text = "${trade.type.name} ${trade.pair}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = trade.timestamp.formatTimeAgo(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(text = trade.price.formatCurrency(), style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    text = "Vol: ${String.format("%.4f", trade.volume)}",
-                    style = MaterialTheme.typography.bodySmall
+                    text = trade.price.formatCurrency(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = String.format("%.4f", trade.volume),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

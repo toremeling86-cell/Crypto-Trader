@@ -3,6 +3,7 @@ package com.cryptotrader.di
 import android.content.Context
 import androidx.room.Room
 import com.cryptotrader.data.local.AppDatabase
+import com.cryptotrader.data.local.dao.PortfolioSnapshotDao
 import com.cryptotrader.data.local.dao.StrategyDao
 import com.cryptotrader.data.local.dao.TradeDao
 import dagger.Module
@@ -45,5 +46,11 @@ object DatabaseModule {
     @Singleton
     fun provideStrategyDao(database: AppDatabase): StrategyDao {
         return database.strategyDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePortfolioSnapshotDao(database: AppDatabase): PortfolioSnapshotDao {
+        return database.portfolioSnapshotDao()
     }
 }

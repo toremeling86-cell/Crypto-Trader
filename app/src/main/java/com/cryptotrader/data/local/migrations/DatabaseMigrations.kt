@@ -50,14 +50,38 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 3 to 4
+     *
+     * Changes:
+     * - Added PortfolioSnapshotEntity table for historical portfolio tracking
+     */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Create portfolio_snapshots table
+            database.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                    timestamp INTEGER PRIMARY KEY NOT NULL,
+                    totalValue REAL NOT NULL,
+                    totalPnL REAL NOT NULL,
+                    totalPnLPercent REAL NOT NULL,
+                    holdingsJson TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
+    /**
      * Get all migrations
      */
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
-            MIGRATION_2_3
+            MIGRATION_2_3,
+            MIGRATION_3_4
             // Add future migrations here
-            // MIGRATION_3_4,
+            // MIGRATION_4_5,
             // etc.
         )
     }

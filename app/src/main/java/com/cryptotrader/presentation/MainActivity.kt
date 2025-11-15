@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cryptotrader.presentation.navigation.NavGraph
@@ -94,26 +96,37 @@ fun BottomNavigationBar(
         NavigationBarItem(
             selected = currentRoute == Screen.Dashboard.route,
             onClick = { onNavigate(Screen.Dashboard.route) },
-            icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
-            label = { Text("Dashboard") }
+            icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
+            label = { Text("Home", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
         )
         NavigationBarItem(
-            selected = currentRoute == Screen.Strategy.route,
-            onClick = { onNavigate(Screen.Strategy.route) },
-            icon = { Icon(Icons.Default.TrendingUp, contentDescription = "Strategies") },
-            label = { Text("Strategies") }
+            selected = currentRoute == Screen.Portfolio.route,
+            onClick = { onNavigate(Screen.Portfolio.route) },
+            icon = { Icon(Icons.Default.PieChart, contentDescription = null) },
+            label = { Text("Portfolio", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Chat.route,
             onClick = { onNavigate(Screen.Chat.route) },
-            icon = { Icon(Icons.Default.Chat, contentDescription = "AI Chat") },
-            label = { Text("AI Chat") }
+            icon = { Icon(Icons.Default.Chat, contentDescription = null) },
+            label = { Text("Chat", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
+        )
+        NavigationBarItem(
+            selected = currentRoute == Screen.Strategy.route,
+            onClick = { onNavigate(Screen.Strategy.route) },
+            icon = { Icon(Icons.Default.TrendingUp, contentDescription = null) },
+            label = { Text("Trades", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Settings.route,
             onClick = { onNavigate(Screen.Settings.route) },
-            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-            label = { Text("Settings") }
+            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+            label = { Text("Settings", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
         )
     }
 }

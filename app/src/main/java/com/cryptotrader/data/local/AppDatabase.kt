@@ -8,15 +8,17 @@ import com.cryptotrader.data.local.entities.*
 @Database(
     entities = [
         TradeEntity::class,
-        StrategyEntity::class
+        StrategyEntity::class,
+        PortfolioSnapshotEntity::class
     ],
-    version = 3, // Incremented version for AI strategy fields
+    version = 4, // Incremented version for Portfolio tracking
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     // ApiKeyDao removed - API keys are now stored only in EncryptedSharedPreferences
     abstract fun tradeDao(): TradeDao
     abstract fun strategyDao(): StrategyDao
+    abstract fun portfolioSnapshotDao(): PortfolioSnapshotDao
 
     companion object {
         const val DATABASE_NAME = "crypto_trader_db"

@@ -141,6 +141,11 @@ dependencies {
     // Charts for price visualization
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
+    // Vico Charts - Compose-friendly charting library
+    implementation("com.patrykandpatrick.vico:compose:1.13.1")
+    implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
+    implementation("com.patrykandpatrick.vico:core:1.13.1")
+
     // Biometric Authentication
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
 

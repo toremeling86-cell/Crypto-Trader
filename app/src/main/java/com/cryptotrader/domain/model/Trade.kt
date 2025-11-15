@@ -16,7 +16,9 @@ data class Trade(
     val strategyId: String? = null,
     val status: TradeStatus = TradeStatus.EXECUTED,
     val profit: Double? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val entryTime: Long? = null,
+    val exitTime: Long? = null
 )
 
 enum class TradeType {
