@@ -9,7 +9,8 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -101,24 +102,24 @@ fun BottomNavigationBar(
             alwaysShowLabel = false
         )
         NavigationBarItem(
+            selected = currentRoute == Screen.Market.route,
+            onClick = { onNavigate(Screen.Market.route) },
+            icon = { Icon(Icons.Default.ShowChart, contentDescription = null) },
+            label = { Text("Market", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
+        )
+        NavigationBarItem(
+            selected = currentRoute == Screen.AI.route,
+            onClick = { onNavigate(Screen.AI.route) },
+            icon = { Icon(Icons.Default.SmartToy, contentDescription = null) },
+            label = { Text("AI", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
+        )
+        NavigationBarItem(
             selected = currentRoute == Screen.Portfolio.route,
             onClick = { onNavigate(Screen.Portfolio.route) },
             icon = { Icon(Icons.Default.PieChart, contentDescription = null) },
             label = { Text("Portfolio", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            alwaysShowLabel = false
-        )
-        NavigationBarItem(
-            selected = currentRoute == Screen.Chat.route,
-            onClick = { onNavigate(Screen.Chat.route) },
-            icon = { Icon(Icons.Default.Chat, contentDescription = null) },
-            label = { Text("Chat", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            alwaysShowLabel = false
-        )
-        NavigationBarItem(
-            selected = currentRoute == Screen.Strategy.route,
-            onClick = { onNavigate(Screen.Strategy.route) },
-            icon = { Icon(Icons.Default.TrendingUp, contentDescription = null) },
-            label = { Text("Trades", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             alwaysShowLabel = false
         )
         NavigationBarItem(

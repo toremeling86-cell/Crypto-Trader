@@ -4,22 +4,22 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.cryptotrader.presentation.screens.chat.ChatScreen
+import com.cryptotrader.presentation.screens.ai.AIScreen
 import com.cryptotrader.presentation.screens.dashboard.DashboardScreen
 import com.cryptotrader.presentation.screens.disclaimer.DisclaimerScreen
+import com.cryptotrader.presentation.screens.market.MarketScreen
 import com.cryptotrader.presentation.screens.portfolio.PortfolioScreen
-import com.cryptotrader.presentation.screens.setup.ApiKeySetupScreen
 import com.cryptotrader.presentation.screens.settings.SettingsScreen
-import com.cryptotrader.presentation.screens.strategy.StrategyConfigScreen
+import com.cryptotrader.presentation.screens.setup.ApiKeySetupScreen
 
 sealed class Screen(val route: String) {
     object Disclaimer : Screen("disclaimer")
     object ApiSetup : Screen("api_setup")
     object Dashboard : Screen("dashboard")
+    object Market : Screen("market")
+    object AI : Screen("ai")
     object Portfolio : Screen("portfolio")
-    object Strategy : Screen("strategy")
     object Settings : Screen("settings")
-    object Chat : Screen("chat")
 }
 
 @Composable
@@ -55,12 +55,16 @@ fun NavGraph(
             DashboardScreen()
         }
 
-        composable(Screen.Portfolio.route) {
-            PortfolioScreen()
+        composable(Screen.Market.route) {
+            MarketScreen()
         }
 
-        composable(Screen.Strategy.route) {
-            StrategyConfigScreen()
+        composable(Screen.AI.route) {
+            AIScreen()
+        }
+
+        composable(Screen.Portfolio.route) {
+            PortfolioScreen()
         }
 
         composable(Screen.Settings.route) {
@@ -69,14 +73,6 @@ fun NavGraph(
                     navController.navigate(Screen.ApiSetup.route) {
                         popUpTo(0) { inclusive = true }
                     }
-                }
-            )
-        }
-
-        composable(Screen.Chat.route) {
-            ChatScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
                 }
             )
         }

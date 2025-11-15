@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.cryptotrader.workers.TradingWorker
+import com.cryptotrader.workers.WorkScheduler
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -17,6 +18,9 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var workScheduler: WorkScheduler
 
     override fun onCreate() {
         super.onCreate()
@@ -36,6 +40,9 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
 
         // Start trading worker if API keys are configured
         startTradingWorkerIfConfigured()
+
+        // Start AI market analysis scheduling
+        startMarketAnalysisIfConfigured()
     }
 
     /**
@@ -134,6 +141,41 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
             Timber.i("⏹️ Trading worker stopped")
         } catch (e: Exception) {
             Timber.e(e, "Failed to stop trading worker")
+        }
+    }
+
+    /**
+     * Start market analysis scheduling if Claude API key is configured
+     */
+    private fun startMarketAnalysisIfConfigured() {
+        try {
+            // Check if Claude API key is set
+            val hasClaudeKey = com.cryptotrader.utils.CryptoUtils.getClaudeApiKey(this)?.isNotBlank() == true
+
+            if (hasClaudeKey) {
+                workScheduler.scheduleMarketAnalysis(enabled = true)
+                Timber.i("✅ AI Market Analysis scheduled (runs every 1 hour)")
+            } else {
+                Timber.d("⏸️ AI Market Analysis not started - Claude API key not configured")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error starting market analysis scheduling")
+        }
+    }
+
+    /**
+     * Enable/disable market analysis scheduling
+     */
+    fun setMarketAnalysisEnabled(enabled: Boolean) {
+        try {
+            workScheduler.scheduleMarketAnalysis(enabled)
+            if (enabled) {
+                Timber.i("🤖 AI Market Analysis enabled")
+            } else {
+                Timber.i("⏸️ AI Market Analysis disabled")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to update market analysis scheduling")
         }
     }
 }

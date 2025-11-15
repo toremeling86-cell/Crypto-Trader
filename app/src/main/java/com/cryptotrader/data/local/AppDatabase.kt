@@ -9,9 +9,16 @@ import com.cryptotrader.data.local.entities.*
     entities = [
         TradeEntity::class,
         StrategyEntity::class,
-        PortfolioSnapshotEntity::class
+        PortfolioSnapshotEntity::class,
+        MarketSnapshotEntity::class,
+        AIMarketAnalysisEntity::class,
+        ExpertReportEntity::class,
+        MarketCorrelationEntity::class,
+        AdvisorAnalysisEntity::class,
+        TradingOpportunityEntity::class,
+        AdvisorNotificationEntity::class
     ],
-    version = 4, // Incremented version for Portfolio tracking
+    version = 7, // Fixed DTO duplicates and schema changes
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -19,6 +26,15 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tradeDao(): TradeDao
     abstract fun strategyDao(): StrategyDao
     abstract fun portfolioSnapshotDao(): PortfolioSnapshotDao
+    abstract fun marketSnapshotDao(): MarketSnapshotDao
+    abstract fun aiMarketAnalysisDao(): AIMarketAnalysisDao
+    abstract fun expertReportDao(): ExpertReportDao
+    abstract fun marketCorrelationDao(): MarketCorrelationDao
+
+    // AI Trading Advisor DAOs
+    abstract fun advisorAnalysisDao(): AdvisorAnalysisDao
+    abstract fun tradingOpportunityDao(): TradingOpportunityDao
+    abstract fun advisorNotificationDao(): AdvisorNotificationDao
 
     companion object {
         const val DATABASE_NAME = "crypto_trader_db"

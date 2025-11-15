@@ -115,8 +115,15 @@ class NotificationManager @Inject constructor(
             val title = "${trade.type} ${trade.pair}"
             val message = "Executed at ${String.format("$%.2f", trade.price)} • Vol: ${String.format("%.4f", trade.volume)}"
 
+            // Choose icon based on trade type
+            val iconRes = when (trade.type.uppercase()) {
+                "BUY" -> R.drawable.ic_notification_trade_buy
+                "SELL" -> R.drawable.ic_notification_trade_sell
+                else -> R.drawable.ic_notification_trade_buy
+            }
+
             val notification = NotificationCompat.Builder(context, CHANNEL_TRADES)
-                .setSmallIcon(R.drawable.ic_launcher_foreground) // TODO: Add proper icon
+                .setSmallIcon(iconRes)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -156,7 +163,7 @@ class NotificationManager @Inject constructor(
             val message = "Entry: $${String.format("%.2f", entryPrice)} → Exit: $${String.format("%.2f", exitPrice)} • P&L: ${String.format("$%.2f", pnl)}"
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification_stop_loss)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -194,7 +201,7 @@ class NotificationManager @Inject constructor(
             val message = "Entry: $${String.format("%.2f", entryPrice)} → Exit: $${String.format("%.2f", exitPrice)} • Profit: ${String.format("$%.2f", pnl)}"
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification_take_profit)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -228,7 +235,7 @@ class NotificationManager @Inject constructor(
             )
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification_emergency_stop)
                 .setContentTitle("🚨 EMERGENCY STOP ACTIVATED")
                 .setContentText("All automated trading has been halted")
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -278,7 +285,7 @@ class NotificationManager @Inject constructor(
             val message = "Today: ${String.format("$%.2f", dayPnL)} • Total: ${String.format("$%.2f", totalPnL)} • Win Rate: ${String.format("%.1f%%", winRate)}"
 
             val notification = NotificationCompat.Builder(context, CHANNEL_PERFORMANCE)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification_trade_buy)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -312,7 +319,7 @@ class NotificationManager @Inject constructor(
             )
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification_opportunity)
                 .setContentTitle("Strategy Activated")
                 .setContentText("$strategyName is now trading automatically")
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -346,7 +353,7 @@ class NotificationManager @Inject constructor(
             )
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification_stop_loss)
                 .setContentTitle("⚠️ Large Loss Alert")
                 .setContentText("Loss of ${String.format("$%.2f", kotlin.math.abs(pnl))} exceeds threshold of ${String.format("$%.2f", threshold)}")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

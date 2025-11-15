@@ -137,8 +137,14 @@ class SettingsViewModel @Inject constructor(
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true)
 
-                val publicKey = _uiState.value.editPublicKey.trim()
-                val privateKey = _uiState.value.editPrivateKey.trim()
+                // Trim and remove ALL whitespace (spaces, tabs, newlines)
+                val publicKey = _uiState.value.editPublicKey
+                    .replace("\\s".toRegex(), "")  // Remove ALL whitespace
+                val privateKey = _uiState.value.editPrivateKey
+                    .replace("\\s".toRegex(), "")  // Remove ALL whitespace
+
+                Timber.d("🔑 Cleaned public key length: ${publicKey.length}")
+                Timber.d("🔑 Cleaned private key length: ${privateKey.length}")
 
                 if (publicKey.isBlank() || privateKey.isBlank()) {
                     _uiState.value = _uiState.value.copy(
@@ -150,16 +156,49 @@ class SettingsViewModel @Inject constructor(
 
                 // Save temporarily and test
                 CryptoUtils.saveApiCredentials(context, publicKey, privateKey)
+
+                Timber.d("🔑 Testing Kraken API keys...")
+                Timber.d("🔑 Public key length: ${publicKey.length}")
+                Timber.d("🔑 Private key length: ${privateKey.length}")
+                Timber.d("🔑 Public key starts with: ${publicKey.take(10)}")
+
                 val balanceResult = krakenRepository.getBalance()
 
                 if (balanceResult.isFailure) {
+                    val error = balanceResult.exceptionOrNull()
+                    Timber.e(error, "❌ API key test failed")
+
                     CryptoUtils.clearApiCredentials(context)
+
+                    val detailedError = when {
+                        error?.message?.contains("EAPI:Invalid key") == true ->
+                            "Invalid API Key. Please check:\n" +
+                            "1. API Key is copied correctly from Kraken\n" +
+                            "2. No extra spaces before/after the key\n" +
+                            "3. Key has 'Query Funds' permission enabled"
+                        error?.message?.contains("EAPI:Invalid signature") == true ->
+                            "Invalid API Secret. Please check:\n" +
+                            "1. API Secret is copied correctly from Kraken\n" +
+                            "2. No extra spaces before/after the secret\n" +
+                            "3. Secret is the full base64 string"
+                        error?.message?.contains("EAPI:Invalid nonce") == true ->
+                            "Nonce error. Your device clock may be incorrect."
+                        else ->
+                            "API test failed: ${error?.message}\n\n" +
+                            "Common issues:\n" +
+                            "• API Key/Secret copied incorrectly\n" +
+                            "• Missing 'Query Funds' permission\n" +
+                            "• Extra spaces in keys"
+                    }
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = "Invalid API keys: ${balanceResult.exceptionOrNull()?.message}"
+                        errorMessage = detailedError
                     )
                     return@launch
                 }
+
+                Timber.i("✅ API keys validated successfully")
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

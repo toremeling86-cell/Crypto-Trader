@@ -26,5 +26,12 @@ data class StrategyEntity(
     // AI Strategy fields
     val analysisReport: String? = null, // Claude's market analysis
     val approvalStatus: String = "APPROVED", // PENDING, APPROVED, REJECTED
-    val source: String = "USER" // USER, AI_CLAUDE
+    val source: String = "USER", // USER, AI_CLAUDE
+
+    // Execution tracking fields (version 7+)
+    val executionStatus: String = "INACTIVE", // INACTIVE, MONITORING, ACTIVE_POSITION, PAUSED
+    val lastCheckedTime: Long? = null,
+    val triggeredAt: Long? = null,
+    val lastExecutionError: String? = null,
+    val executionCount: Int = 0
 )

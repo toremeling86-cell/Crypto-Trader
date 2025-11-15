@@ -1,20 +1,34 @@
 package com.cryptotrader.domain.trading
 
 import com.cryptotrader.domain.model.*
+import com.cryptotrader.utils.FeatureFlags
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Core trading engine that evaluates strategies and generates trade signals
+ *
+ * Supports both V1 (legacy) and V2 (advanced calculator-based) strategy evaluators.
+ * The active evaluator is controlled by FeatureFlags.USE_ADVANCED_INDICATORS.
  */
 @Singleton
 class TradingEngine @Inject constructor(
     private val riskManager: RiskManager,
     private val strategyEvaluator: StrategyEvaluator,
+    private val strategyEvaluatorV2: StrategyEvaluatorV2,
     private val multiTimeframeAnalyzer: MultiTimeframeAnalyzer,
     private val marketRegimeDetector: MarketRegimeDetector
 ) {
+
+    init {
+        // Log which evaluator is active on initialization
+        if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+            Timber.i("TradingEngine initialized with StrategyEvaluatorV2 (advanced calculators)")
+        } else {
+            Timber.i("TradingEngine initialized with StrategyEvaluator V1 (legacy)")
+        }
+    }
 
     /**
      * Evaluate a strategy against current market data and generate trade signal
@@ -86,20 +100,55 @@ class TradingEngine @Inject constructor(
         }
     }
 
+    /**
+     * Get the active strategy evaluator based on feature flag
+     *
+     * Returns V2 (advanced calculator-based) if USE_ADVANCED_INDICATORS is enabled,
+     * otherwise returns V1 (legacy) for backward compatibility.
+     */
+    private fun getActiveEvaluatorEntryConditions(
+        strategy: Strategy,
+        marketData: MarketTicker
+    ): Boolean {
+        return if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+            Timber.d("Using StrategyEvaluatorV2 for entry conditions")
+            strategyEvaluatorV2.evaluateEntryConditions(strategy, marketData)
+        } else {
+            Timber.d("Using StrategyEvaluator V1 for entry conditions")
+            strategyEvaluator.evaluateEntryConditions(strategy, marketData)
+        }
+    }
+
+    /**
+     * Get the active strategy evaluator for exit conditions based on feature flag
+     */
+    private fun getActiveEvaluatorExitConditions(
+        strategy: Strategy,
+        marketData: MarketTicker
+    ): Boolean {
+        return if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+            Timber.d("Using StrategyEvaluatorV2 for exit conditions")
+            strategyEvaluatorV2.evaluateExitConditions(strategy, marketData)
+        } else {
+            Timber.d("Using StrategyEvaluator V1 for exit conditions")
+            strategyEvaluator.evaluateExitConditions(strategy, marketData)
+        }
+    }
+
     private fun evaluateEntryConditions(
         strategy: Strategy,
         marketData: MarketTicker
     ): Boolean {
-        // Use real strategy evaluator with technical indicators
-        return strategyEvaluator.evaluateEntryConditions(strategy, marketData)
+        // Use active strategy evaluator (V1 or V2 based on feature flag)
+        return getActiveEvaluatorEntryConditions(strategy, marketData)
     }
 
     private fun evaluateExitConditions(
         strategy: Strategy,
         marketData: MarketTicker
     ): Boolean {
-        // Use real strategy evaluator with technical indicators
-        return strategyEvaluator.evaluateExitConditions(strategy, marketData)
+        // Use active strategy evaluator (V1 or V2 based on feature flag)
+        return getActiveEvaluatorExitConditions(strategy, marketData)
     }
 
     private fun generateBuySignal(

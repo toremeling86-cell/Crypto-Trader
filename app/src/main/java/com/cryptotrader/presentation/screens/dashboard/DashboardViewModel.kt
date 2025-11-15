@@ -12,6 +12,7 @@ import com.cryptotrader.domain.model.Portfolio
 import com.cryptotrader.domain.model.Strategy
 import com.cryptotrader.domain.model.Trade
 import com.cryptotrader.domain.trading.StrategyEvaluator
+import com.cryptotrader.utils.formatCurrency
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -70,10 +71,39 @@ class DashboardViewModel @Inject constructor(
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
+                // Check if API credentials are configured (only in non-paper-trading mode)
+                val isPaperTrading = com.cryptotrader.utils.CryptoUtils.isPaperTradingMode(context)
+                if (!isPaperTrading) {
+                    val hasApiKeys = com.cryptotrader.utils.CryptoUtils.hasApiCredentials(context)
+                    if (!hasApiKeys) {
+                        Timber.w("⚠️ Kraken API keys not configured - showing empty portfolio")
+
+                        // Create empty portfolio to show user needs to configure API
+                        val emptyPortfolio = Portfolio(
+                            totalValue = 0.0,
+                            availableBalance = 0.0,
+                            balances = emptyMap(),
+                            totalProfit = 0.0,
+                            totalProfitPercent = 0.0,
+                            dayProfit = 0.0,
+                            dayProfitPercent = 0.0,
+                            openPositions = 0
+                        )
+
+                        _uiState.value = _uiState.value.copy(
+                            portfolio = emptyPortfolio,
+                            isLoading = false,
+                            errorMessage = "⚙️ Configure Kraken API keys in Settings to see your portfolio"
+                        )
+                        return@launch
+                    }
+                }
+
                 // Load balance
                 val balanceResult = krakenRepository.getBalance()
                 if (balanceResult.isSuccess) {
                     val krakenBalances = balanceResult.getOrNull() ?: emptyMap()
+                    Timber.d("📊 Kraken balances received: ${krakenBalances.size} assets")
 
                     // Parse Kraken balance response and convert to USD
                     // Format: {"ZUSD": "1000.0000", "XXBT": "0.5000", ...}
@@ -94,6 +124,15 @@ class DashboardViewModel @Inject constructor(
                             // Calculate value in USD
                             val valueInUSD = when (normalizedAsset) {
                                 "USD" -> balance // Already in USD
+                                "EUR" -> {
+                                    // Get EUR/USD exchange rate
+                                    val eurTickerResult = krakenRepository.getTicker("EURUSD")
+                                    if (eurTickerResult.isSuccess) {
+                                        balance * (eurTickerResult.getOrNull()?.last ?: 1.08)
+                                    } else {
+                                        balance * 1.08 // Fallback: ~1.08 USD per EUR
+                                    }
+                                }
                                 "XBT", "BTC" -> {
                                     // Get BTC price to calculate USD value
                                     val btcTickerResult = krakenRepository.getTicker("XXBTZUSD")
@@ -101,6 +140,24 @@ class DashboardViewModel @Inject constructor(
                                         balance * (btcTickerResult.getOrNull()?.last ?: 0.0)
                                     } else {
                                         balance * 40000.0 // Fallback estimate
+                                    }
+                                }
+                                "ETH" -> {
+                                    // Get ETH price to calculate USD value
+                                    val ethTickerResult = krakenRepository.getTicker("XETHZUSD")
+                                    if (ethTickerResult.isSuccess) {
+                                        balance * (ethTickerResult.getOrNull()?.last ?: 0.0)
+                                    } else {
+                                        balance * 2500.0 // Fallback estimate
+                                    }
+                                }
+                                "SOL" -> {
+                                    // Get SOL price to calculate USD value
+                                    val solTickerResult = krakenRepository.getTicker("SOLUSD")
+                                    if (solTickerResult.isSuccess) {
+                                        balance * (solTickerResult.getOrNull()?.last ?: 0.0)
+                                    } else {
+                                        balance * 100.0 // Fallback estimate
                                     }
                                 }
                                 else -> balance * 1.0 // Fallback: assume 1:1 with USD for unknowns
@@ -115,9 +172,9 @@ class DashboardViewModel @Inject constructor(
 
                             totalValueUSD += valueInUSD
 
-                            // Available funds = USD balance (not locked in positions)
-                            if (normalizedAsset == "USD") {
-                                availableFunds = balance
+                            // Available funds = USD + EUR balances (not locked in positions)
+                            if (normalizedAsset == "USD" || normalizedAsset == "EUR") {
+                                availableFunds += valueInUSD
                             }
                         }
                     }
@@ -154,14 +211,30 @@ class DashboardViewModel @Inject constructor(
                         isLoading = false,
                         priceHistoryStatus = priceHistoryStatus
                     )
+
+                    Timber.i("✅ Portfolio loaded: Total value = ${portfolio.totalValue.formatCurrency()}")
                 } else {
                     throw balanceResult.exceptionOrNull() ?: Exception("Unknown error")
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Error loading dashboard data")
+
+                // Create empty portfolio on error
+                val emptyPortfolio = Portfolio(
+                    totalValue = 0.0,
+                    availableBalance = 0.0,
+                    balances = emptyMap(),
+                    totalProfit = 0.0,
+                    totalProfitPercent = 0.0,
+                    dayProfit = 0.0,
+                    dayProfitPercent = 0.0,
+                    openPositions = 0
+                )
+
                 _uiState.value = _uiState.value.copy(
+                    portfolio = emptyPortfolio,
                     isLoading = false,
-                    errorMessage = e.message ?: "Failed to load data"
+                    errorMessage = e.message ?: "Failed to load portfolio data"
                 )
             }
         }

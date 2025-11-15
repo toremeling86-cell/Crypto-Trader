@@ -5,6 +5,9 @@ import com.cryptotrader.data.local.AppDatabase
 import com.cryptotrader.data.local.dao.ApiKeyDao
 import com.cryptotrader.data.local.dao.StrategyDao
 import com.cryptotrader.data.local.dao.TradeDao
+import com.cryptotrader.data.repository.AIAdvisorRepository
+import com.cryptotrader.data.repository.AIAdvisorRepositoryImpl
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,4 +24,15 @@ object AppModule {
     fun provideApplicationContext(
         @ApplicationContext context: Context
     ): Context = context
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class RepositoryModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAIAdvisorRepository(
+        impl: AIAdvisorRepositoryImpl
+    ): AIAdvisorRepository
 }

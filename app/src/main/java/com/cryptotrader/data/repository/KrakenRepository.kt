@@ -5,10 +5,14 @@ import com.cryptotrader.data.local.entities.TradeEntity
 import com.cryptotrader.data.remote.kraken.KrakenApiService
 import com.cryptotrader.data.remote.kraken.KrakenWebSocketClient
 import com.cryptotrader.data.remote.kraken.RateLimiter
+import com.cryptotrader.data.remote.kraken.TickerUpdate
 import com.cryptotrader.domain.model.*
 import com.cryptotrader.domain.usecase.TradeRequest
 import com.cryptotrader.utils.CryptoUtils
+import com.cryptotrader.utils.FeatureFlags
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import javax.inject.Inject
@@ -251,8 +255,15 @@ class KrakenRepository @Inject constructor(
         }
     }
 
-    fun subscribeToTickerUpdates(pairs: List<String>) =
-        webSocketClient.subscribeToTicker(pairs)
+    fun subscribeToTickerUpdates(pairs: List<String>): Flow<TickerUpdate> {
+        return if (FeatureFlags.ENABLE_KRAKEN_WEBSOCKET) {
+            Timber.d("WebSocket enabled - subscribing to ticker updates for pairs: $pairs")
+            webSocketClient.subscribeToTicker(pairs)
+        } else {
+            Timber.d("WebSocket disabled via feature flag - skipping ticker subscription for pairs: $pairs")
+            emptyFlow() // Return empty flow when WebSocket is disabled
+        }
+    }
 
     private fun Trade.toEntity() = TradeEntity(
         orderId = orderId,

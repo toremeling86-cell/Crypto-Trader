@@ -3,6 +3,10 @@ package com.cryptotrader.di
 import android.content.Context
 import androidx.room.Room
 import com.cryptotrader.data.local.AppDatabase
+import com.cryptotrader.data.local.dao.AIMarketAnalysisDao
+import com.cryptotrader.data.local.dao.ExpertReportDao
+import com.cryptotrader.data.local.dao.MarketCorrelationDao
+import com.cryptotrader.data.local.dao.MarketSnapshotDao
 import com.cryptotrader.data.local.dao.PortfolioSnapshotDao
 import com.cryptotrader.data.local.dao.StrategyDao
 import com.cryptotrader.data.local.dao.TradeDao
@@ -52,5 +56,49 @@ object DatabaseModule {
     @Singleton
     fun providePortfolioSnapshotDao(database: AppDatabase): PortfolioSnapshotDao {
         return database.portfolioSnapshotDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideMarketSnapshotDao(database: AppDatabase): MarketSnapshotDao {
+        return database.marketSnapshotDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAIMarketAnalysisDao(database: AppDatabase): AIMarketAnalysisDao {
+        return database.aiMarketAnalysisDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideExpertReportDao(database: AppDatabase): ExpertReportDao {
+        return database.expertReportDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideMarketCorrelationDao(database: AppDatabase): MarketCorrelationDao {
+        return database.marketCorrelationDao()
+    }
+
+    // AI Trading Advisor DAOs
+
+    @Provides
+    @Singleton
+    fun provideAdvisorAnalysisDao(database: AppDatabase): com.cryptotrader.data.local.dao.AdvisorAnalysisDao {
+        return database.advisorAnalysisDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTradingOpportunityDao(database: AppDatabase): com.cryptotrader.data.local.dao.TradingOpportunityDao {
+        return database.tradingOpportunityDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAdvisorNotificationDao(database: AppDatabase): com.cryptotrader.data.local.dao.AdvisorNotificationDao {
+        return database.advisorNotificationDao()
     }
 }

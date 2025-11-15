@@ -2,8 +2,11 @@ package com.cryptotrader.domain.trading
 
 import com.cryptotrader.data.repository.HistoricalDataRepository
 import com.cryptotrader.domain.backtesting.PriceBar
+import com.cryptotrader.domain.indicators.Candle
+import com.cryptotrader.domain.indicators.movingaverage.MovingAverageCalculator
 import com.cryptotrader.domain.model.MarketTicker
 import com.cryptotrader.domain.model.Strategy
+import com.cryptotrader.utils.FeatureFlags
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,11 +14,18 @@ import javax.inject.Singleton
 /**
  * Multi-timeframe analysis engine
  * Confirms signals across multiple timeframes to increase win rate from 50-60% to 65-75%
+ *
+ * V2 Migration: Now supports both legacy StrategyEvaluator (V1) and StrategyEvaluatorV2
+ * with feature flag control for gradual rollout.
  */
 @Singleton
 class MultiTimeframeAnalyzer @Inject constructor(
     private val historicalDataRepository: HistoricalDataRepository,
-    private val strategyEvaluator: StrategyEvaluator
+    private val strategyEvaluator: StrategyEvaluator,
+    private val strategyEvaluatorV2: StrategyEvaluatorV2,
+    private val marketDataAdapter: MarketDataAdapter,
+    private val priceHistoryManager: PriceHistoryManager,
+    private val movingAverageCalculator: MovingAverageCalculator
 ) {
 
     /**
@@ -29,7 +39,12 @@ class MultiTimeframeAnalyzer @Inject constructor(
     ): MultiTimeframeResult {
         if (!strategy.useMultiTimeframe) {
             // Multi-timeframe disabled, fall back to single timeframe
-            val primaryResult = strategyEvaluator.evaluateEntryConditions(strategy, marketData)
+            val primaryResult = if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+                strategyEvaluatorV2.evaluateEntryConditions(strategy, marketData)
+            } else {
+                strategyEvaluator.evaluateEntryConditions(strategy, marketData)
+            }
+
             return MultiTimeframeResult(
                 shouldEnter = primaryResult,
                 confirmedTimeframes = if (primaryResult) listOf(strategy.primaryTimeframe) else emptyList(),
@@ -62,12 +77,9 @@ class MultiTimeframeAnalyzer @Inject constructor(
                     continue
                 }
 
-                // Convert PriceBars to price list for indicator calculation
-                val prices = priceBars.map { it.close }
-
                 // Check if we have enough data for analysis
-                if (prices.size < 30) {
-                    Timber.d("Not enough data for timeframe ${timeframe}m (${prices.size} bars)")
+                if (priceBars.size < 30) {
+                    Timber.d("Not enough data for timeframe ${timeframe}m (${priceBars.size} bars)")
                     continue
                 }
 
@@ -75,13 +87,13 @@ class MultiTimeframeAnalyzer @Inject constructor(
                 val latestBar = priceBars.last()
                 val timeframeMarketData = createMarketTickerFromBar(latestBar, pair)
 
-                // Temporarily update price history for this timeframe
-                prices.forEach { price ->
-                    strategyEvaluator.updatePriceHistory(pair, price)
+                val conditionsMet = if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+                    // V2: Use advanced calculator-based system
+                    evaluateTimeframeV2(priceBars, strategy, timeframeMarketData, pair, timeframe)
+                } else {
+                    // V1: Use legacy indicator system
+                    evaluateTimeframeV1(priceBars, strategy, timeframeMarketData, pair)
                 }
-
-                // Evaluate entry conditions on this timeframe
-                val conditionsMet = strategyEvaluator.evaluateEntryConditions(strategy, timeframeMarketData)
 
                 if (conditionsMet) {
                     confirmedTimeframes.add(timeframe)
@@ -89,13 +101,17 @@ class MultiTimeframeAnalyzer @Inject constructor(
                 } else {
                     Timber.d("Timeframe ${timeframe}m: No signal")
                 }
-
-                // Clear history to avoid mixing timeframes
-                strategyEvaluator.clearHistory()
             }
 
             // Restore real-time price history
-            strategyEvaluator.updatePriceHistory(pair, marketData.last)
+            if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+                // V2: Clear and restore using PriceHistoryManager
+                priceHistoryManager.clearHistory(pair)
+                strategyEvaluatorV2.updatePriceHistory(pair, marketData)
+            } else {
+                // V1: Use legacy method
+                strategyEvaluator.updatePriceHistory(pair, marketData.last)
+            }
 
             // Calculate confidence based on timeframe alignment
             val confirmationRate = confirmedTimeframes.size.toDouble() / allTimeframes.size
@@ -128,6 +144,69 @@ class MultiTimeframeAnalyzer @Inject constructor(
                 confidence = 0.0
             )
         }
+    }
+
+    /**
+     * Evaluate a timeframe using V1 legacy system
+     */
+    private fun evaluateTimeframeV1(
+        priceBars: List<PriceBar>,
+        strategy: Strategy,
+        timeframeMarketData: MarketTicker,
+        pair: String
+    ): Boolean {
+        // Convert PriceBars to price list for indicator calculation
+        val prices = priceBars.map { it.close }
+
+        // Temporarily update price history for this timeframe
+        prices.forEach { price ->
+            strategyEvaluator.updatePriceHistory(pair, price)
+        }
+
+        // Evaluate entry conditions on this timeframe
+        val conditionsMet = strategyEvaluator.evaluateEntryConditions(strategy, timeframeMarketData)
+
+        // Clear history to avoid mixing timeframes
+        strategyEvaluator.clearHistory()
+
+        return conditionsMet
+    }
+
+    /**
+     * Evaluate a timeframe using V2 advanced calculator system
+     */
+    private fun evaluateTimeframeV2(
+        priceBars: List<PriceBar>,
+        strategy: Strategy,
+        timeframeMarketData: MarketTicker,
+        pair: String,
+        timeframe: Int
+    ): Boolean {
+        // Convert PriceBars to Candles using MarketDataAdapter
+        val candles = priceBars.map { bar ->
+            Candle(
+                timestamp = bar.timestamp,
+                open = bar.open,
+                high = bar.high,
+                low = bar.low,
+                close = bar.close,
+                volume = bar.volume
+            )
+        }
+
+        // Update price history using PriceHistoryManager (batch operation for efficiency)
+        priceHistoryManager.clearHistory(pair)
+        priceHistoryManager.updateHistoryBatch(pair, candles)
+
+        if (FeatureFlags.LOG_CACHE_PERFORMANCE) {
+            val historySize = priceHistoryManager.getHistorySize(pair)
+            Timber.d("[MultiTimeframeAnalyzer] Timeframe ${timeframe}m: Loaded $historySize candles for $pair")
+        }
+
+        // Evaluate entry conditions using V2 evaluator
+        val conditionsMet = strategyEvaluatorV2.evaluateEntryConditions(strategy, timeframeMarketData)
+
+        return conditionsMet
     }
 
     /**
@@ -233,15 +312,31 @@ class MultiTimeframeAnalyzer @Inject constructor(
     private fun detectTrend(bars: List<PriceBar>): Trend {
         val prices = bars.map { it.close }
 
-        // Calculate short-term and long-term moving averages
-        val shortMA = TechnicalIndicators.calculateSMA(prices, 10)
-        val longMA = TechnicalIndicators.calculateSMA(prices, 20)
+        if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+            // V2: Use MovingAverageCalculator
+            val shortMAValues = movingAverageCalculator.calculateSMA(prices, 10)
+            val longMAValues = movingAverageCalculator.calculateSMA(prices, 20)
 
-        return when {
-            shortMA == null || longMA == null -> Trend.SIDEWAYS
-            shortMA > longMA * 1.01 -> Trend.BULLISH  // Short MA > Long MA (+ 1% buffer)
-            shortMA < longMA * 0.99 -> Trend.BEARISH  // Short MA < Long MA (- 1% buffer)
-            else -> Trend.SIDEWAYS
+            val shortMA = shortMAValues.lastOrNull()
+            val longMA = longMAValues.lastOrNull()
+
+            return when {
+                shortMA == null || longMA == null -> Trend.SIDEWAYS
+                shortMA > longMA * 1.01 -> Trend.BULLISH  // Short MA > Long MA (+ 1% buffer)
+                shortMA < longMA * 0.99 -> Trend.BEARISH  // Short MA < Long MA (- 1% buffer)
+                else -> Trend.SIDEWAYS
+            }
+        } else {
+            // V1: Use legacy TechnicalIndicators
+            val shortMA = TechnicalIndicators.calculateSMA(prices, 10)
+            val longMA = TechnicalIndicators.calculateSMA(prices, 20)
+
+            return when {
+                shortMA == null || longMA == null -> Trend.SIDEWAYS
+                shortMA > longMA * 1.01 -> Trend.BULLISH  // Short MA > Long MA (+ 1% buffer)
+                shortMA < longMA * 0.99 -> Trend.BEARISH  // Short MA < Long MA (- 1% buffer)
+                else -> Trend.SIDEWAYS
+            }
         }
     }
 }

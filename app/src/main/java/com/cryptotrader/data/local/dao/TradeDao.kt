@@ -60,4 +60,32 @@ interface TradeDao {
     // Get trades since a specific timestamp (for daily/weekly P&L)
     @Query("SELECT * FROM trades WHERE timestamp >= :since ORDER BY timestamp ASC")
     fun getTradesSince(since: Long): Flow<List<TradeEntity>>
+
+    // New execution tracking queries (version 7+)
+    @Query("SELECT * FROM trades WHERE positionId = :positionId ORDER BY executedAt DESC")
+    fun getTradesByPosition(positionId: String): Flow<List<TradeEntity>>
+
+    @Query("SELECT * FROM trades WHERE krakenOrderId = :krakenOrderId")
+    suspend fun getTradeByKrakenOrderId(krakenOrderId: String): TradeEntity?
+
+    @Query("SELECT * FROM trades WHERE krakenTradeId = :krakenTradeId")
+    suspend fun getTradeByKrakenTradeId(krakenTradeId: String): TradeEntity?
+
+    @Query("SELECT * FROM trades WHERE orderType = :orderType ORDER BY executedAt DESC")
+    fun getTradesByOrderType(orderType: String): Flow<List<TradeEntity>>
+
+    @Query("SELECT * FROM trades WHERE strategyId = :strategyId AND executedAt >= :since")
+    suspend fun getStrategyTradesSince(strategyId: String, since: Long): List<TradeEntity>
+
+    @Query("SELECT SUM(realizedPnL) FROM trades WHERE strategyId = :strategyId AND realizedPnL IS NOT NULL")
+    suspend fun getTotalRealizedPnL(strategyId: String): Double?
+
+    @Query("SELECT AVG(realizedPnLPercent) FROM trades WHERE strategyId = :strategyId AND realizedPnLPercent IS NOT NULL")
+    suspend fun getAverageRealizedPnLPercent(strategyId: String): Double?
+
+    @Query("SELECT COUNT(*) FROM trades WHERE strategyId = :strategyId AND realizedPnL > 0")
+    suspend fun getWinningTradeCount(strategyId: String): Int
+
+    @Query("DELETE FROM trades WHERE executedAt < :before")
+    suspend fun deleteTradesBefore(before: Long): Int
 }

@@ -52,7 +52,11 @@ data class TradeBalanceData(
 )
 
 /**
- * Order request
+ * Note: OrderRequest is now defined in OrderRequest.kt
+ */
+
+/**
+ * Add order request (deprecated, use OrderRequest)
  */
 @JsonClass(generateAdapter = true)
 data class AddOrderRequest(
@@ -77,7 +81,13 @@ data class AddOrderResponse(
 @JsonClass(generateAdapter = true)
 data class OrderDescription(
     @Json(name = "order") val order: String = "",
-    @Json(name = "close") val close: String = ""
+    @Json(name = "close") val close: String? = null,
+    @Json(name = "pair") val pair: String? = null,
+    @Json(name = "type") val type: String? = null,
+    @Json(name = "ordertype") val orderType: String? = null,
+    @Json(name = "price") val price: String? = null,
+    @Json(name = "price2") val price2: String? = null,
+    @Json(name = "leverage") val leverage: String? = null
 )
 
 /**
@@ -103,8 +113,11 @@ data class OrderInfo(
     @Json(name = "cost") val cost: String = "0",
     @Json(name = "fee") val fee: String = "0",
     @Json(name = "price") val price: String = "0",
+    @Json(name = "stopprice") val stopPrice: String? = null,
+    @Json(name = "limitprice") val limitPrice: String? = null,
     @Json(name = "misc") val misc: String = "",
-    @Json(name = "oflags") val orderFlags: String = ""
+    @Json(name = "oflags") val orderFlags: String = "",
+    @Json(name = "trades") val trades: List<String>? = null
 )
 
 /**
@@ -151,4 +164,66 @@ data class AssetPairInfo(
     @Json(name = "lot_decimals") val lotDecimals: Int = 0,
     @Json(name = "lot_multiplier") val lotMultiplier: Int = 1,
     @Json(name = "ordermin") val orderMin: String = "0"
+)
+
+/**
+ * OHLC (candlestick) data
+ * Array format: [time, open, high, low, close, vwap, volume, count]
+ */
+data class OHLCData(
+    val time: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val vwap: Double, // Volume-weighted average price
+    val volume: Double,
+    val count: Int // Number of trades
+) {
+    companion object {
+        /**
+         * Parse OHLC data from Kraken's array format
+         * Format: [time, open, high, low, close, vwap, volume, count]
+         */
+        fun fromList(data: List<Any>): OHLCData? {
+            return try {
+                OHLCData(
+                    time = (data[0] as? Number)?.toLong() ?: 0L,
+                    open = (data[1] as? String)?.toDoubleOrNull() ?: 0.0,
+                    high = (data[2] as? String)?.toDoubleOrNull() ?: 0.0,
+                    low = (data[3] as? String)?.toDoubleOrNull() ?: 0.0,
+                    close = (data[4] as? String)?.toDoubleOrNull() ?: 0.0,
+                    vwap = (data[5] as? String)?.toDoubleOrNull() ?: 0.0,
+                    volume = (data[6] as? String)?.toDoubleOrNull() ?: 0.0,
+                    count = (data[7] as? Number)?.toInt() ?: 0
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+}
+
+/**
+ * Cancel order response
+ */
+@JsonClass(generateAdapter = true)
+data class CancelOrderResponse(
+    @Json(name = "count") val count: Int = 0,
+    @Json(name = "pending") val pending: Boolean? = null
+)
+
+/**
+ * Query orders response - maps order ID to OrderInfo
+ * The result from Kraken is a map where keys are transaction IDs
+ */
+typealias QueryOrdersData = Map<String, OrderInfo>
+
+/**
+ * Closed orders response
+ */
+@JsonClass(generateAdapter = true)
+data class ClosedOrdersData(
+    @Json(name = "closed") val closed: Map<String, OrderInfo> = emptyMap(),
+    @Json(name = "count") val count: Int = 0
 )

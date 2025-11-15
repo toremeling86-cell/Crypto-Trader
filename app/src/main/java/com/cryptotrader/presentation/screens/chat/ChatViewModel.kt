@@ -17,14 +17,29 @@ import javax.inject.Inject
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val claudeChatService: ClaudeChatService,
-    private val strategyRepository: StrategyRepository
+    private val strategyRepository: StrategyRepository,
+    private val savedStateHandle: androidx.lifecycle.SavedStateHandle
 ) : ViewModel() {
+
+    companion object {
+        private const val KEY_MESSAGES = "chat_messages"
+        private const val KEY_HAS_WELCOMED = "has_welcomed"
+    }
 
     private val _uiState = MutableStateFlow(ChatState())
     val uiState: StateFlow<ChatState> = _uiState.asStateFlow()
 
     init {
-        addWelcomeMessage()
+        // Restore saved messages if they exist
+        val savedMessages = savedStateHandle.get<List<ChatMessage>>(KEY_MESSAGES)
+        val hasWelcomed = savedStateHandle.get<Boolean>(KEY_HAS_WELCOMED) ?: false
+
+        if (savedMessages != null && savedMessages.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(messages = savedMessages)
+        } else if (!hasWelcomed) {
+            addWelcomeMessage()
+            savedStateHandle[KEY_HAS_WELCOMED] = true
+        }
     }
 
     private fun addWelcomeMessage() {
@@ -165,12 +180,18 @@ class ChatViewModel @Inject constructor(
         val currentMessages = _uiState.value.messages.toMutableList()
         currentMessages.add(message)
         _uiState.value = _uiState.value.copy(messages = currentMessages)
+
+        // Save to SavedStateHandle for persistence
+        savedStateHandle[KEY_MESSAGES] = currentMessages
     }
 
     private fun removeTypingIndicator() {
         val currentMessages = _uiState.value.messages.toMutableList()
         currentMessages.removeAll { it.isTyping }
         _uiState.value = _uiState.value.copy(messages = currentMessages)
+
+        // Save to SavedStateHandle for persistence
+        savedStateHandle[KEY_MESSAGES] = currentMessages
     }
 }
 

@@ -26,7 +26,7 @@ import javax.inject.Singleton
 class ClaudeChatService @Inject constructor(
     private val claudeApi: ClaudeApiService,
     private val strategyGenerator: ClaudeStrategyGenerator,
-    private val krakenRepository: KrakenRepository,
+    private val aiContextBuilder: AIContextBuilder,
     private val strategyRepository: StrategyRepository,
     @ApplicationContext private val context: Context
 ) {
@@ -111,84 +111,88 @@ class ClaudeChatService @Inject constructor(
     }
 
     /**
-     * Build system prompt with portfolio and LIVE market context
+     * Build system prompt with FULL context from AIContextBuilder
+     * This makes Claude EXTREMELY intelligent about the user's situation
      */
     private suspend fun buildSystemPrompt(includeContext: Boolean): String {
         var prompt = """
-            You are an expert cryptocurrency trading assistant integrated into a mobile trading app.
+            You are an EXPERT cryptocurrency trading assistant integrated into a LIVE mobile trading app.
 
-            The app uses Kraken exchange API for LIVE trading with real money.
+            The app uses Kraken exchange API for REAL-MONEY trading.
 
-            Your capabilities:
-            1. Analyze LIVE market data from Kraken
-            2. Generate data-driven trading strategies based on current market conditions
-            3. Provide detailed risk analysis and market insights
-            4. Answer questions about trading and technical analysis
-            5. Give actionable recommendations
+            Your role as AI Mission Control:
+            1. Analyze LIVE market data from Kraken (Bitcoin, Ethereum, Solana, etc.)
+            2. Monitor the user's portfolio and provide personalized advice
+            3. Generate data-driven trading strategies based on current market conditions
+            4. Provide comprehensive risk analysis and actionable insights
+            5. Learn from the user's trading patterns and preferences
+            6. Give SPECIFIC, ACTIONABLE recommendations - not generic advice
 
-            IMPORTANT: When creating a strategy, you MUST:
-            1. Analyze the current market data provided below
-            2. Explain WHY this strategy fits the current market
-            3. Provide a detailed analysis report
-            4. Return the strategy in JSON format
+            CRITICAL CAPABILITIES:
+            - You have FULL ACCESS to: Live market prices, user's portfolio, recent trades
+            - You can SEE the user's current positions, P&L, and exposure
+            - You KNOW what crypto they own and their trading history
+            - You can ANALYZE if they should buy/sell/hold based on THEIR situation
 
-            JSON format for strategies (REQUIRED FIELDS):
+            When creating a strategy, you MUST:
+            1. Analyze the current market data provided in the context below
+            2. Explain WHY this strategy fits the CURRENT market conditions
+            3. Provide a DETAILED analysis report (minimum 200 words)
+            4. Return the strategy in the exact JSON format specified
+
+            JSON format for strategies (ALL FIELDS REQUIRED):
             {
-              "name": "Strategy Name",
-              "description": "Brief description of strategy logic",
-              "entryConditions": ["Specific entry rules like 'RSI < 30'", "Price crosses above 50 MA"],
-              "exitConditions": ["Exit rules like 'RSI > 70'", "Take profit hit"],
+              "name": "Strategy Name (descriptive, e.g. 'BTC Mean Reversion Q4 2024')",
+              "description": "Brief description of strategy logic and trading style",
+              "entryConditions": ["SPECIFIC entry rules like 'RSI < 30'", "Price crosses above 50 MA", "Volume spike > 2x average"],
+              "exitConditions": ["SPECIFIC exit rules like 'RSI > 70'", "Take profit at +6%", "Stop loss at -3%"],
               "stopLossPercent": 3.0,
               "takeProfitPercent": 6.0,
               "positionSizePercent": 5.0,
               "tradingPairs": ["XXBTZUSD"],
               "riskLevel": "LOW|MEDIUM|HIGH",
-              "analysisReport": "DETAILED analysis: Current market trends, why this strategy works now, risk factors, expected outcomes. Be thorough!"
+              "analysisReport": "COMPREHENSIVE analysis (minimum 200 words): Current market trends for this specific asset, technical indicators supporting the strategy, fundamental factors, why THIS strategy works NOW, risk factors, expected win rate, optimal market conditions, what could go wrong, and recommended monitoring approach. Be THOROUGH and SPECIFIC!"
             }
 
-            Be analytical, data-driven, and prioritize risk management.
-            Use Norwegian when user writes in Norwegian, English otherwise.
+            Communication style:
+            - Be direct and analytical, not vague
+            - Use data and numbers to support recommendations
+            - Prioritize RISK MANAGEMENT above profit
+            - Respond in Norwegian if user writes in Norwegian
+            - When unsure, say so - don't guess
+
+            NOW, here is the LIVE context about the user and markets:
         """.trimIndent()
 
         if (includeContext) {
             try {
-                // Add portfolio context
-                val balanceResult = krakenRepository.getBalance()
-                if (balanceResult.isSuccess) {
-                    val balances = balanceResult.getOrNull()
-                    prompt += "\n\n📊 CURRENT PORTFOLIO:\n$balances"
+                // Use AI Context Builder for comprehensive, structured context
+                val fullContext = aiContextBuilder.buildFullContext(
+                    includeMarketData = true,
+                    includePortfolio = true,
+                    includeTrades = true
+                )
+
+                if (fullContext.isNotEmpty()) {
+                    prompt += "\n\n$fullContext"
                 }
 
-                // Add LIVE market data from Kraken
-                prompt += "\n\n📈 LIVE MARKET DATA (fra Kraken):"
-                val majorPairs = listOf("XXBTZUSD", "XETHZUSD", "SOLUSD")
-
-                for (pair in majorPairs) {
-                    try {
-                        val ticker = krakenRepository.getTicker(pair)
-                        if (ticker.isSuccess) {
-                            val data = ticker.getOrNull()
-                            if (data != null) {
-                                prompt += "\n\n$pair:"
-                                prompt += "\n  • Last Price: $${data.last}"
-                                prompt += "\n  • 24h High: $${data.high24h}"
-                                prompt += "\n  • 24h Low: $${data.low24h}"
-                                prompt += "\n  • 24h Volume: ${data.volume24h}"
-                                prompt += "\n  • Bid: $${data.bid} / Ask: $${data.ask}"
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Timber.w("Failed to get ticker for $pair")
+                // Add active strategies summary
+                val strategies = strategyRepository.getActiveStrategies().first()
+                if (strategies.isNotEmpty()) {
+                    prompt += "\n\n# ACTIVE STRATEGIES"
+                    prompt += "\nCurrently running strategies:"
+                    strategies.forEach { strategy ->
+                        prompt += "\n- ${strategy.name} (${strategy.tradingPairs.joinToString()})"
+                        prompt += "\n  Risk: ${strategy.riskLevel}, Status: ${strategy.approvalStatus}"
                     }
                 }
 
-                // Add active strategies context
-                val strategies = strategyRepository.getActiveStrategies().first()
-                if (strategies.isNotEmpty()) {
-                    prompt += "\n\n⚙️ ACTIVE STRATEGIES:\n${strategies.map { "• ${it.name} (${it.tradingPairs.joinToString()})" }.joinToString("\n")}"
-                }
+                Timber.d("Built full AI context: ${fullContext.length} chars")
+
             } catch (e: Exception) {
-                Timber.w(e, "Failed to add context to prompt")
+                Timber.e(e, "Failed to build AI context")
+                prompt += "\n\n# CONTEXT UNAVAILABLE\nError loading market/portfolio data."
             }
         }
 

@@ -97,36 +97,55 @@ interface KrakenApiService {
 
     /**
      * Get open orders
+     * @param nonce Unique nonce for request
+     * @param trades Whether to include trades in output
+     * @param userref Filter results by user reference id
      */
     @FormUrlEncoded
     @POST("0/private/OpenOrders")
-    suspend fun getOpenOrders(
+    suspend fun openOrders(
         @Field("nonce") nonce: String,
-        @Field("trades") includeTrades: Boolean? = false
+        @Field("trades") trades: Boolean? = false,
+        @Field("userref") userref: String? = null
     ): Response<KrakenResponse<OpenOrdersData>>
 
     /**
      * Get closed orders
+     * @param nonce Unique nonce for request
+     * @param trades Whether to include trades in output
+     * @param userref Filter results by user reference id
+     * @param start Starting unix timestamp or order tx id
+     * @param end Ending unix timestamp or order tx id
+     * @param ofs Result offset
+     * @param closetime Which time to use: "open", "close", "both" (default)
      */
     @FormUrlEncoded
     @POST("0/private/ClosedOrders")
-    suspend fun getClosedOrders(
+    suspend fun closedOrders(
         @Field("nonce") nonce: String,
-        @Field("trades") includeTrades: Boolean? = false,
-        @Field("start") start: Long? = null,
-        @Field("end") end: Long? = null
-    ): Response<KrakenResponse<Map<String, Any>>>
+        @Field("trades") trades: Boolean? = false,
+        @Field("userref") userref: String? = null,
+        @Field("start") start: String? = null,
+        @Field("end") end: String? = null,
+        @Field("ofs") ofs: Int? = null,
+        @Field("closetime") closetime: String? = null
+    ): Response<KrakenResponse<ClosedOrdersData>>
 
     /**
      * Query orders info
+     * @param nonce Unique nonce for request
+     * @param txid Comma-delimited list of transaction ids to query
+     * @param trades Whether to include trades in output
+     * @param userref Filter results by user reference id
      */
     @FormUrlEncoded
     @POST("0/private/QueryOrders")
     suspend fun queryOrders(
         @Field("nonce") nonce: String,
-        @Field("txid") transactionIds: String, // Comma-delimited list
-        @Field("trades") includeTrades: Boolean? = false
-    ): Response<KrakenResponse<Map<String, OrderInfo>>>
+        @Field("txid") txid: String,
+        @Field("trades") trades: Boolean? = false,
+        @Field("userref") userref: String? = null
+    ): Response<KrakenResponse<QueryOrdersData>>
 
     /**
      * Get trades history
@@ -143,30 +162,49 @@ interface KrakenApiService {
 
     /**
      * Add standard order
+     * @param nonce Unique nonce for request
+     * @param pair Asset pair (e.g., "XBTUSD")
+     * @param type Order direction: "buy" or "sell"
+     * @param orderType Order type: "market", "limit", "stop-loss", "take-profit", "stop-loss-limit", "take-profit-limit"
+     * @param volume Order volume in lots
+     * @param price Price (required for limit orders)
+     * @param price2 Secondary price (for stop-loss-limit, take-profit-limit)
+     * @param leverage Desired leverage amount (default: none)
+     * @param oflags Order flags: "post" (post-only), "fcib" (prefer fee in base currency), "fciq" (prefer fee in quote currency), "nompp" (no market price protection)
+     * @param starttm Scheduled start time (0 for now, +<n> for offset)
+     * @param expiretm Expiration time (0 for no expiration, +<n> for offset)
+     * @param userref User reference id (32-bit signed number)
+     * @param validate Validate inputs only, do not submit order
      */
     @FormUrlEncoded
     @POST("0/private/AddOrder")
     suspend fun addOrder(
         @Field("nonce") nonce: String,
         @Field("pair") pair: String,
-        @Field("type") type: String, // "buy" or "sell"
-        @Field("ordertype") orderType: String, // "market", "limit", "stop-loss", "take-profit", etc.
-        @Field("price") price: String? = null,
+        @Field("type") type: String,
+        @Field("ordertype") orderType: String,
         @Field("volume") volume: String,
-        @Field("validate") validate: Boolean? = false,
-        @Field("userref") userRef: String? = null,
-        @Field("oflags") orderFlags: String? = null // "post" for post-only, "fcib" for prefer fee in base currency, etc.
+        @Field("price") price: String? = null,
+        @Field("price2") price2: String? = null,
+        @Field("leverage") leverage: String? = null,
+        @Field("oflags") oflags: String? = null,
+        @Field("starttm") starttm: String? = null,
+        @Field("expiretm") expiretm: String? = null,
+        @Field("userref") userref: String? = null,
+        @Field("validate") validate: Boolean? = false
     ): Response<KrakenResponse<AddOrderResponse>>
 
     /**
      * Cancel order
+     * @param nonce Unique nonce for request
+     * @param txid Transaction ID of order to cancel
      */
     @FormUrlEncoded
     @POST("0/private/CancelOrder")
     suspend fun cancelOrder(
         @Field("nonce") nonce: String,
-        @Field("txid") transactionId: String
-    ): Response<KrakenResponse<Map<String, Any>>>
+        @Field("txid") txid: String
+    ): Response<KrakenResponse<CancelOrderResponse>>
 
     /**
      * Cancel all orders
