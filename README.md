@@ -1,12 +1,13 @@
 # CryptoTrader - AI-Powered Cryptocurrency Trading Platform
 
 [![Android CI](https://github.com/toremeling86-cell/Crypto-Trader/actions/workflows/build-test.yml/badge.svg)](https://github.com/toremeling86-cell/Crypto-Trader/actions/workflows/build-test.yml)
-[![DB Version](https://img.shields.io/badge/Database-v16-blue)](./MIGRATIONS.md)
+[![DB Version](https://img.shields.io/badge/Database-v19-blue)](./MIGRATIONS.md)
 [![Review Ready](https://img.shields.io/badge/Review-9/9%20(100%25)-brightgreen)](./REVIEW_READY_CHECKLIST.md)
+[![Secrets Scan](https://img.shields.io/badge/Secrets-Gitleaks%20✓-green)](./.gitleaks.toml)
 
 **CryptoTrader** er en profesjonell Android-applikasjon for automatisert kryptovalutahandel med Kraken API-integrasjon og AI-drevet strategigenerering.
 
-**Status:** ✅ Review-Ready | 🚀 Active Development | 📊 DB v16
+**Status:** ✅ Review-Ready | 🚀 Active Development | 📊 DB v19
 
 ## 🚀 Funksjoner
 
@@ -87,10 +88,11 @@ cp .env.example .env
 ### CI/CD Pipeline
 
 All pushes to `main` automatically trigger:
-- ✅ Code style checks (ktlint, detekt)
-- ✅ Unit tests (`testDebugUnitTest`)
-- ✅ Smoke tests (backtest pipeline validation)
-- ✅ APK build verification
+- ✅ **Secrets scanning** (Gitleaks - prevents credential leaks)
+- ✅ **Code style checks** (ktlint, detekt)
+- ✅ **Unit tests** (`testDebugUnitTest`)
+- ✅ **Smoke tests** (backtest pipeline validation)
+- ✅ **APK build verification**
 
 **View CI Status:** [GitHub Actions](https://github.com/toremeling86-cell/Crypto-Trader/actions)
 
@@ -140,10 +142,20 @@ All pushes to `main` automatically trigger:
 
 ## 📊 Database Schema
 
-### Tabeller
-- **api_keys**: Krypterte API credentials
-- **strategies**: Handelsstrategier
-- **trades**: Historikk over utførte trades
+**Current Version:** v19 (Meta-Analysis Integration)
+
+### Key Tables
+- **strategies**: Trading strategies with performance tracking
+- **trades**: Trade execution history
+- **backtest_runs**: Backtest results with data provenance (v17+)
+- **meta_analyses**: AI-generated strategy analysis (v11+)
+- **knowledge_base**: Cross-strategy learning insights (v19+)
+- **expert_reports**: Market analysis reports for meta-analysis
+
+### Documentation
+- **Migration History:** [MIGRATIONS.md](./MIGRATIONS.md) - Complete migration changelog (v1→v19)
+- **Migration Policy:** [DB_MIGRATION_POLICY.md](./DB_MIGRATION_POLICY.md) - Database change procedures (TODO 8)
+- **Phase 3 E2E:** [docs/PHASE3_E2E_GUIDE.md](./docs/PHASE3_E2E_GUIDE.md) - Meta-analysis testing guide
 
 ## 🔧 Konfigurasjon
 
