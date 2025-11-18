@@ -15,6 +15,7 @@ import androidx.room.PrimaryKey
  * Version: 13+ (Database migration required)
  * Version: 14+ (Added dataTier tracking - CRITICAL for quality control)
  * Version: 17+ (Added data provenance tracking - P1-4)
+ * Version: 18+ (Added cost model tracking - P1-5)
  */
 @Entity(
     tableName = "backtest_runs",
@@ -69,5 +70,12 @@ data class BacktestRunEntity(
     // Data provenance (version 17+)
     val dataFileHashes: String = "[]",      // JSON array of SHA-256 hashes for input files
     val parserVersion: String = "",         // Semver of data parser (e.g., "1.0.0")
-    val engineVersion: String = ""          // Semver of backtest engine (e.g., "1.0.0")
+    val engineVersion: String = "",         // Semver of backtest engine (e.g., "1.0.0")
+
+    // Cost model tracking (version 18+)
+    val assumedCostBps: Double = 0.0,       // Assumed trading cost in basis points (from config)
+    val observedCostBps: Double = 0.0,      // Observed trading cost from actual trades (half-spread + slippage)
+    val costDeltaBps: Double = 0.0,         // Delta between observed and assumed (observedCostBps - assumedCostBps)
+    val aggregatedFees: Double = 0.0,       // Total fees paid across all trades in backtest
+    val aggregatedSlippage: Double = 0.0    // Total slippage observed across all trades in backtest
 )

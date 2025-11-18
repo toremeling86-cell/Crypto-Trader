@@ -886,6 +886,35 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 17 to 18
+     *
+     * Changes:
+     * - Added cost model tracking fields to backtest_runs table
+     * - Added assumedCostBps column (assumed trading cost in basis points)
+     * - Added observedCostBps column (observed cost from actual trades)
+     * - Added costDeltaBps column (delta between observed and assumed)
+     * - Added aggregatedFees column (total fees paid)
+     * - Added aggregatedSlippage column (total slippage observed)
+     * - Enables tracking of actual vs assumed trading costs per backtest run
+     *
+     * P1-5: Cost Model Tracking Implementation (Phase 1.7)
+     */
+    val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            Timber.i("Running migration 17→18: Adding cost model tracking to backtest_runs")
+
+            // Add cost model tracking fields to backtest_runs table
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN assumedCostBps REAL NOT NULL DEFAULT 0.0")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN observedCostBps REAL NOT NULL DEFAULT 0.0")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN costDeltaBps REAL NOT NULL DEFAULT 0.0")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN aggregatedFees REAL NOT NULL DEFAULT 0.0")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN aggregatedSlippage REAL NOT NULL DEFAULT 0.0")
+
+            Timber.i("Migration 17→18: Cost model tracking fields added. Backtest runs now track assumed vs observed trading costs.")
+        }
+    }
+
+    /**
      * Get all migrations
      */
     fun getAllMigrations(): Array<Migration> {
@@ -905,7 +934,8 @@ object DatabaseMigrations {
             MIGRATION_13_14,
             MIGRATION_14_15,
             MIGRATION_15_16,
-            MIGRATION_16_17
+            MIGRATION_16_17,
+            MIGRATION_17_18
         )
     }
 }

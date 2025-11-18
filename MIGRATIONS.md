@@ -1,13 +1,13 @@
 # Database Migrations
 
-**Current Version:** v17
+**Current Version:** v18
 **Schema File:** `app/src/main/java/com/cryptotrader/data/local/AppDatabase.kt`
 **Migration File:** `app/src/main/java/com/cryptotrader/data/local/migrations/DatabaseMigrations.kt`
 
 ## Migration Chain
 
 ```
-v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16 → v17
+v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16 → v17 → v18
 ```
 
 ## Migration History
@@ -141,7 +141,7 @@ v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v
   - Created index on `isInvalid` for efficient filtering
 - **Reason:** Preserve strategy history for debugging (P0-1)
 
-### v16 → v17: Data Provenance (CURRENT)
+### v16 → v17: Data Provenance
 - **Date:** November 2024
 - **Changes:**
   - Added `dataFileHashes` column to `backtest_runs` (JSON array of SHA-256 hashes)
@@ -150,18 +150,18 @@ v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v
 - **Reason:** 100% reproducible backtest verification (P1-4, Phase 1.6)
 - **Rollback:** Safe - new columns have default values, existing runs unaffected
 
-## Pending Migrations
-
-### v17 → v18: Cost Model Tracking (P1-5)
-- **Status:** Planned
+### v17 → v18: Cost Model Tracking (CURRENT)
+- **Date:** November 2024
 - **Changes:**
-  - Add cost tracking fields to `backtest_runs`:
-    - `assumedCostBps` - Assumed cost basis points
-    - `observedCostBps` - Observed cost from actual trades
-    - `costDeltaBps` - Delta between assumed and observed
-    - `aggregatedFees` - Total fees paid
-    - `aggregatedSlippage` - Total slippage observed
-- **Reason:** Track actual vs assumed trading costs per run
+  - Added `assumedCostBps` column to `backtest_runs` (assumed trading cost in basis points)
+  - Added `observedCostBps` column to `backtest_runs` (observed cost from actual trades)
+  - Added `costDeltaBps` column to `backtest_runs` (delta between observed and assumed)
+  - Added `aggregatedFees` column to `backtest_runs` (total fees paid)
+  - Added `aggregatedSlippage` column to `backtest_runs` (total slippage observed)
+- **Reason:** Track actual vs assumed trading costs per backtest run (P1-5, Phase 1.7)
+- **Rollback:** Safe - new columns have default values (0.0), existing runs unaffected
+
+## Pending Migrations
 
 ### v18 → v19: Meta-Analysis Integration (P0-2)
 - **Status:** Planned

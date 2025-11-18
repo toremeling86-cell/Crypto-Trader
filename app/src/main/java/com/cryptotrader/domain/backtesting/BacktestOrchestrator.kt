@@ -253,6 +253,7 @@ class BacktestOrchestrator @Inject constructor(
      * Persist backtest run to database for historical tracking
      *
      * Version 17+: Includes data provenance tracking for 100% reproducibility
+     * Version 18+: Includes cost model tracking for assumed vs observed costs
      */
     private suspend fun persistBacktestRun(
         result: BacktestResult,
@@ -262,10 +263,20 @@ class BacktestOrchestrator @Inject constructor(
             // Calculate data provenance
             val dataFileHashes = generateDataFileHashes(dataSet)
 
+            // Calculate cost metrics (v18+)
+            val costMetrics = calculateCostMetrics(result)
+
             Timber.i("📊 Data Provenance:")
             Timber.i("   Hash: ${dataFileHashes.take(50)}...")
             Timber.i("   Parser Version: $PARSER_VERSION")
             Timber.i("   Engine Version: $ENGINE_VERSION")
+
+            Timber.i("💰 Cost Metrics:")
+            Timber.i("   Assumed Cost: ${String.format("%.2f", costMetrics.assumedCostBps)} bps")
+            Timber.i("   Observed Cost: ${String.format("%.2f", costMetrics.observedCostBps)} bps")
+            Timber.i("   Cost Delta: ${String.format("%.2f", costMetrics.costDeltaBps)} bps")
+            Timber.i("   Total Fees: $${String.format("%.2f", costMetrics.aggregatedFees)}")
+            Timber.i("   Total Slippage: $${String.format("%.2f", costMetrics.aggregatedSlippage)}")
 
             val backtestRun = BacktestRunEntity(
                 strategyId = result.strategyId,
@@ -293,12 +304,19 @@ class BacktestOrchestrator @Inject constructor(
                 // Data provenance (v17+)
                 dataFileHashes = dataFileHashes,
                 parserVersion = PARSER_VERSION,
-                engineVersion = ENGINE_VERSION
+                engineVersion = ENGINE_VERSION,
+                // Cost model tracking (v18+)
+                assumedCostBps = costMetrics.assumedCostBps,
+                observedCostBps = costMetrics.observedCostBps,
+                costDeltaBps = costMetrics.costDeltaBps,
+                aggregatedFees = costMetrics.aggregatedFees,
+                aggregatedSlippage = costMetrics.aggregatedSlippage
             )
 
             backtestRunDao.insert(backtestRun)
             Timber.i("✅ Backtest run persisted to database (ID: ${backtestRun.id})")
             Timber.i("✅ Provenance tracking: 100% reproducible")
+            Timber.i("✅ Cost tracking: Assumed vs observed costs recorded")
 
         } catch (e: Exception) {
             Timber.e(e, "Failed to persist backtest run")
@@ -315,6 +333,42 @@ class BacktestOrchestrator @Inject constructor(
             result.winRate >= 50.0 && result.profitFactor >= 1.0 -> "ACCEPTABLE"
             else -> "FAILED"
         }
+    }
+
+    /**
+     * Calculate cost metrics from backtest result
+     *
+     * Version 18+: Tracks assumed vs observed trading costs
+     *
+     * @param result Backtest result with fee and slippage data
+     * @return Cost metrics in basis points and absolute values
+     */
+    private fun calculateCostMetrics(result: BacktestResult): CostMetrics {
+        // Calculate total trade volume
+        val totalTradeVolume = result.trades.sumOf { it.quantity * it.entryPrice }
+
+        // Assumed cost: 10 bps (0.10%) as baseline for crypto exchanges
+        // This is a conservative estimate for maker fees (Kraken: 0.16%, Binance: 0.10%)
+        val assumedCostBps = 10.0
+
+        // Observed cost: actual fees + slippage + spread
+        val totalCost = result.totalFees + result.totalSlippage + result.totalSpreadCost
+        val observedCostBps = if (totalTradeVolume > 0.0) {
+            (totalCost / totalTradeVolume) * 10000.0 // Convert to basis points
+        } else {
+            0.0
+        }
+
+        // Delta: observed - assumed (positive = worse than expected, negative = better)
+        val costDeltaBps = observedCostBps - assumedCostBps
+
+        return CostMetrics(
+            assumedCostBps = assumedCostBps,
+            observedCostBps = observedCostBps,
+            costDeltaBps = costDeltaBps,
+            aggregatedFees = result.totalFees,
+            aggregatedSlippage = result.totalSlippage + result.totalSpreadCost
+        )
     }
 
     /**
@@ -362,3 +416,16 @@ class BacktestOrchestrator @Inject constructor(
         private const val ENGINE_VERSION = "1.0.0"
     }
 }
+
+/**
+ * Cost Metrics - Trading cost analysis
+ *
+ * Version 18+: Tracks assumed vs observed trading costs
+ */
+data class CostMetrics(
+    val assumedCostBps: Double,       // Assumed trading cost in basis points (from config/baseline)
+    val observedCostBps: Double,      // Observed trading cost from actual trades
+    val costDeltaBps: Double,         // Delta between observed and assumed (observed - assumed)
+    val aggregatedFees: Double,       // Total fees paid across all trades
+    val aggregatedSlippage: Double    // Total slippage + spread cost across all trades
+)

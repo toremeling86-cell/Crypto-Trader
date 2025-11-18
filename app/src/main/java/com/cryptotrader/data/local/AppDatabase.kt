@@ -25,7 +25,7 @@ import com.cryptotrader.data.local.entities.*
         DataQualityEntity::class,
         DataQuarterCoverageEntity::class
     ],
-    version = 17, // Migration 16→17: Add data provenance to backtest_runs (dataFileHashes, parserVersion, engineVersion)
+    version = 18, // Migration 17→18: Add cost model tracking to backtest_runs (assumedCostBps, observedCostBps, costDeltaBps, aggregatedFees, aggregatedSlippage)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
