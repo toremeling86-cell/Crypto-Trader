@@ -5,6 +5,72 @@
 **Last Updated:** November 18, 2024
 **Status:** ✅ Active (TODO 8)
 
+---
+
+## 🔒 FREEZE NOTICE - v19 Stable Release
+
+**⚠️ DATABASE SCHEMA FREEZE UNTIL PHASE 4 PLANNING COMPLETE**
+
+**Effective:** November 18, 2024 (Release v0.19.0)
+**Scope:** Database v19 and core backtest systems
+**Duration:** Until Phase 4 planning approved by database owner
+
+### What is Frozen:
+
+1. **No new database migrations** without explicit Phase 4 approval
+2. **No breaking changes** to these core systems:
+   - `BacktestEngine.kt`
+   - `BacktestOrchestrator.kt`
+   - `StrategyEvaluator.kt` / `StrategyEvaluatorV2.kt`
+   - `TradingCostModel.kt`
+   - `BacktestDataProvider.kt`
+   - All `*Entity.kt` files (database schema)
+3. **No changes** to migration files (`MIGRATION_16_17`, `MIGRATION_17_18`, `MIGRATION_18_19`)
+
+### What is Allowed:
+
+✅ **Bug fixes** that don't change schema or core logic
+✅ **Documentation updates**
+✅ **UI/UX improvements** (presentation layer only)
+✅ **New features** outside of backtest core (e.g., report visualization)
+✅ **Performance optimizations** with database owner approval
+✅ **Test additions** (strongly encouraged)
+
+### Rationale:
+
+Database v19 represents a **stable foundation** with:
+- Complete data provenance tracking
+- Accurate cost modeling
+- AI-powered meta-analysis
+- Full observability (NDJSON)
+- Comprehensive testing
+
+This freeze ensures:
+- Time to verify production stability
+- Manual verification completion
+- Phase 4 planning before new complexity
+- Safe rollback point (v0.19.0 tag)
+
+### How to Request Changes:
+
+1. **Document the need** in PHASE4_PLANNING.md
+2. **Get database owner approval** before implementation
+3. **Wait for freeze lift** (announced via team communication)
+4. **Follow normal migration procedures** once freeze is lifted
+
+### Freeze Lift Criteria:
+
+- [ ] Manual verification checklist completed (see RELEASE_NOTES_v19.md)
+- [ ] CI green for 48 hours on main
+- [ ] No production issues reported
+- [ ] Phase 4 planning document approved
+- [ ] Database owner explicitly lifts freeze
+
+**Freeze Status:** 🔒 **ACTIVE**
+**Next Review:** 7 days from November 18, 2024
+
+---
+
 ## Table of Contents
 
 1. [Purpose](#purpose)
