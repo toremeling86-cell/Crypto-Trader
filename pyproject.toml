@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto-trader"
+version = "0.1.0"
+description = "Reference scaffolding for a crypto trading service"
+authors = [{ name = "Crypto Trader" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=1.5",
+    "pyarrow>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = {find = {where = ["src"]}}
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
