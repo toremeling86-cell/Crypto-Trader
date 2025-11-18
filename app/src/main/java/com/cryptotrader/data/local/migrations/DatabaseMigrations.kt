@@ -915,6 +915,62 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 18 to 19
+     *
+     * Changes:
+     * - Added learningEnabled column to meta_analyses table
+     * - Created knowledge_base table for cross-strategy learning
+     * - Enables AI-powered learning from meta-analyses and backtest results
+     *
+     * P0-2: Meta-Analysis Integration (Phase 1.8)
+     */
+    val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            Timber.i("Running migration 18→19: Adding meta-analysis learning and knowledge base")
+
+            // Add learningEnabled to meta_analyses
+            database.execSQL("ALTER TABLE meta_analyses ADD COLUMN learningEnabled INTEGER NOT NULL DEFAULT 1")
+
+            // Create knowledge_base table
+            database.execSQL("""
+                CREATE TABLE IF NOT EXISTS knowledge_base (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    category TEXT NOT NULL,
+                    assetClass TEXT NOT NULL DEFAULT 'CRYPTO',
+                    title TEXT NOT NULL,
+                    insight TEXT NOT NULL,
+                    recommendation TEXT NOT NULL,
+                    marketRegime TEXT,
+                    tradingPairs TEXT,
+                    timeframes TEXT,
+                    confidence REAL NOT NULL,
+                    evidenceCount INTEGER NOT NULL,
+                    successRate REAL,
+                    avgReturn REAL,
+                    sourceType TEXT NOT NULL,
+                    sourceIds TEXT NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    lastUpdatedAt INTEGER NOT NULL,
+                    createdBy TEXT NOT NULL DEFAULT 'SYSTEM',
+                    isActive INTEGER NOT NULL DEFAULT 1,
+                    invalidatedAt INTEGER,
+                    invalidationReason TEXT
+                )
+            """)
+
+            // Create indexes for knowledge_base
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_base_category ON knowledge_base(category)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_base_assetClass ON knowledge_base(assetClass)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_base_marketRegime ON knowledge_base(marketRegime)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_base_confidence ON knowledge_base(confidence)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_base_createdAt ON knowledge_base(createdAt)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_base_lastUpdatedAt ON knowledge_base(lastUpdatedAt)")
+
+            Timber.i("Migration 18→19: Meta-analysis learning enabled. Knowledge base created for cross-strategy learning.")
+        }
+    }
+
+    /**
      * Get all migrations
      */
     fun getAllMigrations(): Array<Migration> {
@@ -935,7 +991,8 @@ object DatabaseMigrations {
             MIGRATION_14_15,
             MIGRATION_15_16,
             MIGRATION_16_17,
-            MIGRATION_17_18
+            MIGRATION_17_18,
+            MIGRATION_18_19
         )
     }
 }

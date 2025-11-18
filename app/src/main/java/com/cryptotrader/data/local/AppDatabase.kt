@@ -23,9 +23,10 @@ import com.cryptotrader.data.local.entities.*
         DataCoverageEntity::class,
         BacktestRunEntity::class,
         DataQualityEntity::class,
-        DataQuarterCoverageEntity::class
+        DataQuarterCoverageEntity::class,
+        KnowledgeBaseEntity::class
     ],
-    version = 18, // Migration 17→18: Add cost model tracking to backtest_runs (assumedCostBps, observedCostBps, costDeltaBps, aggregatedFees, aggregatedSlippage)
+    version = 19, // Migration 18→19: Add learningEnabled to meta_analyses, create knowledge_base table for cross-strategy learning
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -45,6 +46,9 @@ abstract class AppDatabase : RoomDatabase() {
 
     // Meta-Analysis DAO
     abstract fun metaAnalysisDao(): MetaAnalysisDao
+
+    // Knowledge Base DAO (version 19+)
+    abstract fun knowledgeBaseDao(): KnowledgeBaseDao
 
     // Backend Data Storage DAOs (version 13+)
     abstract fun ohlcBarDao(): OHLCBarDao

@@ -1,13 +1,13 @@
 # Database Migrations
 
-**Current Version:** v18
+**Current Version:** v19
 **Schema File:** `app/src/main/java/com/cryptotrader/data/local/AppDatabase.kt`
 **Migration File:** `app/src/main/java/com/cryptotrader/data/local/migrations/DatabaseMigrations.kt`
 
 ## Migration Chain
 
 ```
-v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16 → v17 → v18
+v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16 → v17 → v18 → v19
 ```
 
 ## Migration History
@@ -150,7 +150,7 @@ v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v
 - **Reason:** 100% reproducible backtest verification (P1-4, Phase 1.6)
 - **Rollback:** Safe - new columns have default values, existing runs unaffected
 
-### v17 → v18: Cost Model Tracking (CURRENT)
+### v17 → v18: Cost Model Tracking
 - **Date:** November 2024
 - **Changes:**
   - Added `assumedCostBps` column to `backtest_runs` (assumed trading cost in basis points)
@@ -161,15 +161,20 @@ v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v
 - **Reason:** Track actual vs assumed trading costs per backtest run (P1-5, Phase 1.7)
 - **Rollback:** Safe - new columns have default values (0.0), existing runs unaffected
 
+### v18 → v19: Meta-Analysis Integration (CURRENT)
+- **Date:** November 2024
+- **Changes:**
+  - Added `learningEnabled` column to `meta_analyses` (default TRUE)
+  - Created `knowledge_base` table with 19 columns for cross-strategy learning
+  - KnowledgeBase tracks: category, insights, recommendations, evidence, confidence
+  - Enables AI to learn from meta-analyses and backtest results
+  - Added indexes on category, assetClass, marketRegime, confidence
+- **Reason:** Enable AI-powered cross-strategy learning and pattern recognition (P0-2, Phase 1.8)
+- **Rollback:** Safe - learningEnabled defaults to 1 (enabled), new table independent
+
 ## Pending Migrations
 
-### v18 → v19: Meta-Analysis Integration (P0-2)
-- **Status:** Planned
-- **Changes:**
-  - Re-enable MetaAnalysisEntity in AppDatabase
-  - Add `learningEnabled` column to `meta_analysis`
-  - Create `knowledge_base` table for cross-strategy learning
-- **Reason:** Restore full AI learning functionality
+No pending migrations currently planned. Database schema v19 is complete.
 
 ## Migration Testing
 
