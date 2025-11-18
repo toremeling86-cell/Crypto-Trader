@@ -345,7 +345,7 @@ class BacktestOrchestrator @Inject constructor(
      */
     private fun calculateCostMetrics(result: BacktestResult): CostMetrics {
         // Calculate total trade volume
-        val totalTradeVolume = result.trades.sumOf { it.quantity * it.entryPrice }
+        val totalTradeVolume = result.trades.sumOf { it.volume * it.entryPrice }
 
         // Assumed cost: 10 bps (0.10%) as baseline for crypto exchanges
         // This is a conservative estimate for maker fees (Kraken: 0.16%, Binance: 0.10%)
@@ -354,7 +354,7 @@ class BacktestOrchestrator @Inject constructor(
         // Observed cost: actual fees + slippage + spread
         val totalCost = result.totalFees + result.totalSlippage + result.totalSpreadCost
         val observedCostBps = if (totalTradeVolume > 0.0) {
-            (totalCost / totalTradeVolume) * 10000.0 // Convert to basis points
+            (totalCost.toDouble() / totalTradeVolume) * 10000.0 // Convert to basis points
         } else {
             0.0
         }
