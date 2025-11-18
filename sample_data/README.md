@@ -8,15 +8,15 @@ This directory contains minimal historical OHLC data for smoke testing the backt
 
 ### `XXBTZUSD_1h_sample.csv`
 
-**Format:** CSV with header
-**Columns:**
-1. `timestamp` - Unix timestamp in milliseconds
-2. `open` - Opening price (USD)
-3. `high` - Highest price (USD)
-4. `low` - Lowest price (USD)
-5. `close` - Closing price (USD)
-6. `volume` - Trading volume (BTC)
-7. `trades` - Number of trades (optional)
+- **Format:** CSV with header
+- **Columns:**
+  1. `timestamp` - Unix timestamp in milliseconds
+  2. `open` - Opening price (USD)
+  3. `high` - Highest price (USD)
+  4. `low` - Lowest price (USD)
+  5. `close` - Closing price (USD)
+  6. `volume` - Trading volume (BTC)
+  7. `trades` - Number of trades (optional)
 
 **Example:**
 ```csv
@@ -25,17 +25,16 @@ timestamp,open,high,low,close,volume,trades
 1700003600000,42550.0,42700.0,42500.0,42680.0,15.2,312
 ```
 
-## Data Coverage
+## Indicator Coverage
 
-- **Asset:** XXBTZUSD (Bitcoin/USD on Kraken)
-- **Timeframe:** 1h (hourly bars)
-- **Period:** 30 days (720 bars)
-- **Date Range:** November 2024
-- **Data Quality:** Tier 3 Standard (no gaps, validated OHLC)
+The diagnostic RSI smoke test expects:
+- RSI calculations on closing prices (period 14 by default)
+- Basic volatility awareness from OHLC fields (high/low for slippage checks)
+- No additional indicators required
 
 ## Parser
 
-Use `ParquetFileReader` or `DataFileParser` from:
+Use `DataFileParser` (CSV) or `ParquetFileReader` (Parquet) from:
 ```
 app/src/main/java/com/cryptotrader/data/dataimport/
 ```
@@ -50,9 +49,17 @@ val bars = parser.parseCsvFile(
 )
 ```
 
+## Data Coverage
+
+- **Asset:** XXBTZUSD (Bitcoin/USD on Kraken)
+- **Timeframe:** 1h (hourly bars)
+- **Period:** 30 days (720 bars)
+- **Date Range:** November 2024
+- **Data Quality:** Tier 3 Standard (no gaps, validated OHLC)
+
 ## Expected Backtest Results
 
-Running RSI Diagnostics strategy on this data should produce:
+Running the diagnostic RSI strategy on this data should produce:
 - **Trades:** 10-15
 - **Win Rate:** 50-60%
 - **Sharpe Ratio:** 0.8-1.5
