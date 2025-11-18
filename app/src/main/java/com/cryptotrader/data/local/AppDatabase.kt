@@ -25,7 +25,7 @@ import com.cryptotrader.data.local.entities.*
         DataQualityEntity::class,
         DataQuarterCoverageEntity::class
     ],
-    version = 16, // Migration 15→16: Add soft-delete fields to strategies (isInvalid, invalidReason, invalidatedAt)
+    version = 17, // Migration 16→17: Add data provenance to backtest_runs (dataFileHashes, parserVersion, engineVersion)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

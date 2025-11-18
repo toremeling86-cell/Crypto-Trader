@@ -861,6 +861,31 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 16 to 17
+     *
+     * Changes:
+     * - Added data provenance fields to backtest_runs table
+     * - Added dataFileHashes column (JSON array of SHA-256 hashes)
+     * - Added parserVersion column (semver for data parser)
+     * - Added engineVersion column (semver for backtest engine)
+     * - Enables 100% reproducible backtest verification
+     *
+     * P1-4: Data Provenance Implementation (Phase 1.6)
+     */
+    val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            Timber.i("Running migration 16→17: Adding data provenance tracking to backtest_runs")
+
+            // Add data provenance fields to backtest_runs table
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN dataFileHashes TEXT NOT NULL DEFAULT '[]'")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN parserVersion TEXT NOT NULL DEFAULT ''")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN engineVersion TEXT NOT NULL DEFAULT ''")
+
+            Timber.i("Migration 16→17: Data provenance fields added. Backtest runs are now 100% traceable to source datasets and parser/engine versions.")
+        }
+    }
+
+    /**
      * Get all migrations
      */
     fun getAllMigrations(): Array<Migration> {
@@ -879,7 +904,8 @@ object DatabaseMigrations {
             MIGRATION_12_13,
             MIGRATION_13_14,
             MIGRATION_14_15,
-            MIGRATION_15_16
+            MIGRATION_15_16,
+            MIGRATION_16_17
         )
     }
 }

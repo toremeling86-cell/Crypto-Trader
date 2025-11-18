@@ -14,6 +14,7 @@ import androidx.room.PrimaryKey
  *
  * Version: 13+ (Database migration required)
  * Version: 14+ (Added dataTier tracking - CRITICAL for quality control)
+ * Version: 17+ (Added data provenance tracking - P1-4)
  */
 @Entity(
     tableName = "backtest_runs",
@@ -63,5 +64,10 @@ data class BacktestRunEntity(
     // Metadata
     val dataSource: String,         // "KRAKEN_API", "CRYPTOLAKE", "FREEDOMBOT", "MIXED"
     val executedAt: Long = System.currentTimeMillis(),
-    val durationMs: Long = 0        // Backtest execution time in milliseconds
+    val durationMs: Long = 0,       // Backtest execution time in milliseconds
+
+    // Data provenance (version 17+)
+    val dataFileHashes: String = "[]",      // JSON array of SHA-256 hashes for input files
+    val parserVersion: String = "",         // Semver of data parser (e.g., "1.0.0")
+    val engineVersion: String = ""          // Semver of backtest engine (e.g., "1.0.0")
 )

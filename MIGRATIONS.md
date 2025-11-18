@@ -1,13 +1,13 @@
 # Database Migrations
 
-**Current Version:** v16
+**Current Version:** v17
 **Schema File:** `app/src/main/java/com/cryptotrader/data/local/AppDatabase.kt`
 **Migration File:** `app/src/main/java/com/cryptotrader/data/local/migrations/DatabaseMigrations.kt`
 
 ## Migration Chain
 
 ```
-v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16
+v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16 → v17
 ```
 
 ## Migration History
@@ -132,7 +132,7 @@ v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v
   - Tracks downloaded quarters from Cloudflare R2
 - **Reason:** Efficient cloud data management
 
-### v15 → v16: Strategy Soft-Delete (CURRENT)
+### v15 → v16: Strategy Soft-Delete
 - **Date:** November 2024
 - **Changes:**
   - Added `isInvalid` column to `strategies` (0 = valid, 1 = invalid)
@@ -141,29 +141,35 @@ v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v
   - Created index on `isInvalid` for efficient filtering
 - **Reason:** Preserve strategy history for debugging (P0-1)
 
+### v16 → v17: Data Provenance (CURRENT)
+- **Date:** November 2024
+- **Changes:**
+  - Added `dataFileHashes` column to `backtest_runs` (JSON array of SHA-256 hashes)
+  - Added `parserVersion` column to `backtest_runs` (semver for data parser)
+  - Added `engineVersion` column to `backtest_runs` (semver for backtest engine)
+- **Reason:** 100% reproducible backtest verification (P1-4, Phase 1.6)
+- **Rollback:** Safe - new columns have default values, existing runs unaffected
+
 ## Pending Migrations
 
-### v16 → v17: Data Provenance (P1-4)
+### v17 → v18: Cost Model Tracking (P1-5)
 - **Status:** Planned
 - **Changes:**
-  - Add `dataFileHash` column to `backtest_runs`
-  - Add `dataParserVersion` column to `backtest_runs`
-  - Add `dataSourcePath` column to `backtest_runs`
-- **Reason:** Reproducible backtest verification
+  - Add cost tracking fields to `backtest_runs`:
+    - `assumedCostBps` - Assumed cost basis points
+    - `observedCostBps` - Observed cost from actual trades
+    - `costDeltaBps` - Delta between assumed and observed
+    - `aggregatedFees` - Total fees paid
+    - `aggregatedSlippage` - Total slippage observed
+- **Reason:** Track actual vs assumed trading costs per run
 
-### v17 → v18: Parameterized Cost Model (P1-5)
+### v18 → v19: Meta-Analysis Integration (P0-2)
 - **Status:** Planned
 - **Changes:**
-  - Create `cost_profiles` table
-  - Add `costProfileId` column to `backtest_runs`
-- **Reason:** Accurate per-instrument fee tracking
-
-### v18 → v19: Re-enable MetaAnalysis (P0-2)
-- **Status:** Planned
-- **Changes:**
+  - Re-enable MetaAnalysisEntity in AppDatabase
   - Add `learningEnabled` column to `meta_analysis`
-  - Create `knowledge_base` table
-- **Reason:** Restore full learning functionality
+  - Create `knowledge_base` table for cross-strategy learning
+- **Reason:** Restore full AI learning functionality
 
 ## Migration Testing
 
