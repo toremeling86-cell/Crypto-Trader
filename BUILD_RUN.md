@@ -73,9 +73,9 @@ I/BacktestEngine: Total Fees: $8.45
 
 ## Database Migrations
 
-Current version: **v16**
+Current version: **v19**
 
-Migration chain: v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16
+Migration chain: v1 → v2 → v3 → v4 → v5 → v6 → v7 → v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15 → v16 → v17 → v18 → v19
 
 See `MIGRATIONS.md` for detailed migration history.
 
@@ -91,12 +91,34 @@ See `MIGRATIONS.md` for detailed migration history.
       └── trades.csv           # Individual trade records
 ```
 
-### NDJSON Event Stream Format (P1-7):
+### NDJSON Event Stream Format (TODO 4 - IMPLEMENTED):
+
+**Status:** ✅ Implemented in TODO 4 (P1-7)
+
+**Event Logger:** `BacktestEventLogger.kt`
+
+**Event Types:**
 ```json
-{"type":"backtest_start","timestamp":1700000000,"run_id":"bt_123","strategy":"RSI"}
-{"type":"trade","timestamp":1700001000,"action":"BUY","price":42500.0,"size":0.1}
-{"type":"trade","timestamp":1700002000,"action":"SELL","price":43000.0,"pnl":50.0}
-{"type":"backtest_end","timestamp":1700010000,"total_trades":12,"sharpe":1.34}
+{"type":"backtest_start","timestamp":1700000000,"runId":"bt_123","strategyId":"s1","strategyName":"RSI","startingBalance":10000.0}
+{"type":"bar_processed","timestamp":1700001000,"runId":"bt_123","barIndex":0,"price":42500.0}
+{"type":"trade","timestamp":1700002000,"runId":"bt_123","action":"BUY","price":42500.0,"size":0.1,"pnl":null}
+{"type":"trade","timestamp":1700003000,"runId":"bt_123","action":"SELL","price":43000.0,"size":0.1,"pnl":50.0}
+{"type":"error","timestamp":1700004000,"runId":"bt_123","error":"Insufficient funds"}
+{"type":"backtest_end","timestamp":1700010000,"runId":"bt_123","totalTrades":12,"winRate":0.58,"totalPnL":420.0,"sharpeRatio":1.34,"maxDrawdown":210.0}
+```
+
+**Index File (index.csv):**
+```csv
+run_id,strategy_name,start_time,end_time,total_trades,win_rate,total_pnl,sharpe_ratio,events_file
+bt_1700000000,RSI Diagnostics,1700000000,1700010000,12,58.33,420.00,1.34,/data/.../backtests/bt_1700000000/events.ndjson
+```
+
+**Usage:**
+```kotlin
+val logger = BacktestEventLogger(context)
+val runId = logger.startBacktest(strategy, 10000.0)
+logger.logTrade(runId, timestamp, "BUY", 42500.0, 0.1)
+logger.endBacktest(runId, timestamp, 12, 0.58, 420.0, 1.34, 210.0)
 ```
 
 ## Verification Checklist
