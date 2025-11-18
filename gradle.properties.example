@@ -1,0 +1,21 @@
+# Project-wide Gradle settings
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+org.gradle.parallel=true
+org.gradle.caching=true
+
+# Android Build Configuration
+android.useAndroidX=true
+android.enableJetifier=false
+android.nonTransitiveRClass=true
+
+# Kotlin Configuration
+kotlin.code.style=official
+
+# API Keys (use .env file instead for local development)
+# These are placeholders for CI/CD environments
+CLAUDE_API_KEY=
+KRAKEN_API_KEY=
+KRAKEN_PRIVATE_KEY=
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
