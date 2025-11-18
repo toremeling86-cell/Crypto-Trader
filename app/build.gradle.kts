@@ -69,6 +69,20 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "DebugProbesKt.bin"
+            // Arrow/Netty packaging conflicts
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+            // Arrow duplicate resources
+            excludes += "arrow-git.properties"
+            excludes += "META-INF/versions/9/module-info.class"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/license.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/notice.txt"
+            excludes += "META-INF/ASL2.0"
         }
     }
 }
@@ -152,10 +166,33 @@ dependencies {
     // Timber Logging
     implementation("com.jakewharton.timber:timber:5.0.1")
 
+    // PDF Processing
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // File management
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // Cloud Storage - AWS SDK for S3 (R2 compatible)
+    implementation(platform("aws.sdk.kotlin:bom:1.0.30"))
+    implementation("aws.sdk.kotlin:s3")
+    implementation("aws.sdk.kotlin:aws-core")
+    implementation("aws.sdk.kotlin:aws-config")
+
+    // Parquet Support - Apache Arrow
+    implementation("org.apache.arrow:arrow-vector:14.0.2")
+    implementation("org.apache.arrow:arrow-memory-netty:14.0.2")
+    implementation("org.apache.arrow:arrow-format:14.0.2")
+
+    // Compression - Zstandard
+    implementation("com.github.luben:zstd-jni:1.5.5-5@aar")
+
     // Testing Dependencies
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.8")
+    testImplementation("org.mockito:mockito-core:5.7.0") // For BacktestEventLoggerTest
+    testImplementation("org.mockito:mockito-inline:5.2.0") // For mocking Android Context
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.20")
 
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
