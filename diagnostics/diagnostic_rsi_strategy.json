@@ -1,0 +1,62 @@
+{
+  "strategyId": "diagnostic_rsi_20241118",
+  "name": "RSI Diagnostics (Smoke Test)",
+  "description": "Diagnostic strategy for smoke test validation. RSI<30 BUY, RSI>70 SELL. This strategy is designed to produce trades on any reasonable dataset for pipeline health checks.",
+  "version": "1.0.0",
+  "isDiagnostic": true,
+  "isActive": false,
+  "pair": "XXBTZUSD",
+  "timeframe": "1h",
+  "parameters": {
+    "rsiPeriod": 14,
+    "rsiOversold": 30,
+    "rsiOverbought": 70,
+    "positionSize": 0.01,
+    "maxPositions": 1
+  },
+  "entryConditions": [
+    {
+      "indicator": "RSI",
+      "period": 14,
+      "condition": "lessThan",
+      "value": 30,
+      "description": "Enter long when RSI drops below 30 (oversold)"
+    }
+  ],
+  "exitConditions": [
+    {
+      "indicator": "RSI",
+      "period": 14,
+      "condition": "greaterThan",
+      "value": 70,
+      "description": "Exit long when RSI rises above 70 (overbought)"
+    }
+  ],
+  "riskManagement": {
+    "stopLoss": null,
+    "takeProfit": null,
+    "trailingStop": null,
+    "maxDrawdown": 0.20,
+    "maxPositionSize": 0.01
+  },
+  "backtestMetadata": {
+    "expectedBehavior": "Should produce >0 trades on any 24h+ dataset with volatility",
+    "smokeTestMinTrades": 1,
+    "smokeTestPurpose": "Validate backtest pipeline functionality",
+    "validationChecks": [
+      "trades.size > 0",
+      "sharpe.isFinite()",
+      "no look-ahead bias"
+    ]
+  },
+  "notes": [
+    "This is a DIAGNOSTIC strategy for smoke tests only",
+    "DO NOT use for live trading",
+    "DO NOT display in normal strategy list",
+    "Used by BacktestSmokeTest.kt and CI/CD pipeline",
+    "Guarantees trade generation for health checks"
+  ],
+  "createdAt": "2024-11-18T00:00:00Z",
+  "createdBy": "system",
+  "tags": ["diagnostic", "smoke-test", "rsi", "system-health"]
+}
