@@ -4,6 +4,7 @@ import com.cryptotrader.data.local.dao.MarketSnapshotDao
 import com.cryptotrader.data.local.entities.MarketSnapshotEntity
 import com.cryptotrader.data.remote.kraken.KrakenApiService
 import com.cryptotrader.data.remote.kraken.RateLimiter
+import com.cryptotrader.data.remote.kraken.dto.TickerData
 import com.cryptotrader.domain.model.MarketSnapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

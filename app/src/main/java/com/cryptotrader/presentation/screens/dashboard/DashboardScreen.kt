@@ -21,6 +21,7 @@ import com.cryptotrader.presentation.theme.loss
 import com.cryptotrader.presentation.theme.warning
 import com.cryptotrader.utils.formatCurrency
 import com.cryptotrader.utils.formatTimeAgo
+import com.cryptotrader.presentation.components.TradingModeIndicator
 
 /**
  * Professional Wall Street-Level Dashboard
@@ -38,6 +39,7 @@ fun DashboardScreen(
     val isPaperTrading = com.cryptotrader.utils.CryptoUtils.isPaperTradingMode(context)
     val isEmergencyStopped = com.cryptotrader.utils.CryptoUtils.isEmergencyStopActive(context)
     var showStopConfirmDialog by remember { mutableStateOf(false) }
+    var selectedCurrency by remember { mutableStateOf(viewModel.getSelectedCurrency()) }
 
     // Emergency Stop Confirmation Dialog
     if (showStopConfirmDialog) {
@@ -93,6 +95,30 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("Dashboard", fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    // Trading Mode Indicator
+                    TradingModeIndicator(
+                        isLiveMode = !isPaperTrading,
+                        isCompact = true,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+
+                    // Currency toggle - cycles through USD -> EUR -> NOK
+                    FilledTonalButton(
+                        onClick = {
+                            selectedCurrency = when (selectedCurrency) {
+                                com.cryptotrader.data.preferences.Currency.USD -> com.cryptotrader.data.preferences.Currency.EUR
+                                com.cryptotrader.data.preferences.Currency.EUR -> com.cryptotrader.data.preferences.Currency.NOK
+                                com.cryptotrader.data.preferences.Currency.NOK -> com.cryptotrader.data.preferences.Currency.USD
+                            }
+                            viewModel.setSelectedCurrency(selectedCurrency)
+                        },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = selectedCurrency.code,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     IconButton(onClick = viewModel::refresh) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
@@ -334,14 +360,42 @@ fun DashboardScreen(
                         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(modifier = Modifier.padding(20.dp)) {
-                            Text(
-                                text = "Portfolio Value",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Portfolio Value",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                // Show exchange rate info
+                                when (selectedCurrency) {
+                                    com.cryptotrader.data.preferences.Currency.EUR -> {
+                                        Text(
+                                            text = "1 EUR = ${String.format("$%.4f", portfolio.eurUsdRate)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    com.cryptotrader.data.preferences.Currency.NOK -> {
+                                        Text(
+                                            text = "$1 = ${String.format("%.2f kr", portfolio.usdNokRate)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    else -> {} // USD selected - no exchange rate needed
+                                }
+                            }
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = portfolio.totalValue.formatCurrency(),
+                                text = when (selectedCurrency) {
+                                    com.cryptotrader.data.preferences.Currency.EUR -> portfolio.totalValueEUR.formatCurrency(selectedCurrency)
+                                    com.cryptotrader.data.preferences.Currency.USD -> portfolio.totalValue.formatCurrency(selectedCurrency)
+                                    com.cryptotrader.data.preferences.Currency.NOK -> portfolio.totalValueNOK.formatCurrency(selectedCurrency)
+                                },
                                 style = MaterialTheme.typography.displaySmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -363,7 +417,11 @@ fun DashboardScreen(
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = portfolio.totalProfit.formatCurrency(),
+                                        text = when (selectedCurrency) {
+                                            com.cryptotrader.data.preferences.Currency.EUR -> portfolio.totalProfitEUR.formatCurrency(selectedCurrency)
+                                            com.cryptotrader.data.preferences.Currency.USD -> portfolio.totalProfit.formatCurrency(selectedCurrency)
+                                            com.cryptotrader.data.preferences.Currency.NOK -> portfolio.totalProfitNOK.formatCurrency(selectedCurrency)
+                                        },
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.Bold,
                                         color = if (portfolio.totalProfit >= 0)
@@ -400,7 +458,11 @@ fun DashboardScreen(
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = portfolio.dayProfit.formatCurrency(),
+                                        text = when (selectedCurrency) {
+                                            com.cryptotrader.data.preferences.Currency.EUR -> portfolio.dayProfitEUR.formatCurrency(selectedCurrency)
+                                            com.cryptotrader.data.preferences.Currency.USD -> portfolio.dayProfit.formatCurrency(selectedCurrency)
+                                            com.cryptotrader.data.preferences.Currency.NOK -> portfolio.dayProfitNOK.formatCurrency(selectedCurrency)
+                                        },
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (portfolio.dayProfit >= 0)
@@ -498,6 +560,7 @@ fun StrategyCard(strategy: com.cryptotrader.domain.model.Strategy) {
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // Header: Name and Top Performer Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -522,15 +585,80 @@ fun StrategyCard(strategy: com.cryptotrader.domain.model.Strategy) {
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+
+                // Top Performer Badge (Phase 3C)
+                if (strategy.isTopPerformer) {
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        color = Color(0xFF4CAF50).copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color(0xFF4CAF50))
+                    ) {
+                        Text(
+                            text = "TOP 10%",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF4CAF50)
+                        )
+                    }
+                }
+            }
+
+            // AI-Generated Strategy Info (Phase 3C)
+            if (strategy.source == com.cryptotrader.domain.model.StrategySource.AI_CLAUDE && strategy.sourceReportCount > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "AI-Generated from ${ strategy.sourceReportCount} expert reports",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Performance Score (Phase 3C)
+            if (strategy.performanceScore > 0.0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Performance Score",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = String.format("%.1f/100", strategy.performanceScore),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            strategy.performanceScore >= 80.0 -> Color(0xFF4CAF50)
+                            strategy.performanceScore >= 60.0 -> Color(0xFFFFA726)
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Core Metrics Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Trades",
                         style = MaterialTheme.typography.bodySmall,
@@ -542,7 +670,7 @@ fun StrategyCard(strategy: com.cryptotrader.domain.model.Strategy) {
                         fontWeight = FontWeight.Medium
                     )
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Win Rate",
                         style = MaterialTheme.typography.bodySmall,
@@ -559,7 +687,7 @@ fun StrategyCard(strategy: com.cryptotrader.domain.model.Strategy) {
                     )
                 }
                 if (strategy.totalProfit != 0.0) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "P&L",
                             style = MaterialTheme.typography.bodySmall,
@@ -570,6 +698,100 @@ fun StrategyCard(strategy: com.cryptotrader.domain.model.Strategy) {
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium,
                             color = if (strategy.totalProfit >= 0)
+                                MaterialTheme.colorScheme.profit
+                            else
+                                MaterialTheme.colorScheme.loss
+                        )
+                    }
+                }
+            }
+
+            // Advanced Metrics (Phase 3C) - Show if strategy has trades
+            if (strategy.totalTrades > 0) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Profit Factor and Sharpe Ratio
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (strategy.profitFactor > 0.0) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Profit Factor",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = String.format("%.2f", strategy.profitFactor),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = when {
+                                    strategy.profitFactor >= 2.0 -> Color(0xFF4CAF50)
+                                    strategy.profitFactor >= 1.0 -> MaterialTheme.colorScheme.onSurface
+                                    else -> MaterialTheme.colorScheme.loss
+                                }
+                            )
+                        }
+                    }
+
+                    strategy.sharpeRatio?.let { sharpe ->
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Sharpe Ratio",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = String.format("%.2f", sharpe),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = when {
+                                    sharpe >= 1.5 -> Color(0xFF4CAF50)
+                                    sharpe >= 1.0 -> MaterialTheme.colorScheme.onSurface
+                                    else -> MaterialTheme.colorScheme.loss
+                                }
+                            )
+                        }
+                    }
+
+                    if (strategy.maxDrawdown != 0.0) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Max Drawdown",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = String.format("%.1f%%", strategy.maxDrawdown),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.loss
+                            )
+                        }
+                    }
+                }
+
+                // Current Streak
+                if (strategy.currentStreak != 0) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Current Streak",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${if (strategy.currentStreak > 0) "+" else ""}${strategy.currentStreak}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (strategy.currentStreak > 0)
                                 MaterialTheme.colorScheme.profit
                             else
                                 MaterialTheme.colorScheme.loss

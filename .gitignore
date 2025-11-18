@@ -88,3 +88,8 @@ lint/tmp/
 
 # Windows special device file
 nul
+
+# Large data files (30GB+) - CryptoLake historical data
+/data/
+*.parquet
+*.csv

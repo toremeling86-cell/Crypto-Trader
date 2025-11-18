@@ -29,14 +29,9 @@ class PerformanceCalculator @Inject constructor() {
             val currentValue = snapshots.lastOrNull()?.totalValue ?: 0.0
             val initialValue = snapshots.firstOrNull()?.totalValue ?: currentValue
 
-            val dailyValues = snapshots.takeLast(2)
-            val dailyPnL = if (dailyValues.size == 2) {
-                dailyValues[1].totalValue - dailyValues[0].totalValue
-            } else 0.0
-
-            val dailyPnLPercent = if (dailyValues.size == 2 && dailyValues[0].totalValue > 0) {
-                (dailyPnL / dailyValues[0].totalValue) * 100.0
-            } else 0.0
+            // Calculate daily P&L with proper 24-hour time period validation
+            val dailyPnL = calculateDailyPnL(snapshots)
+            val dailyPnLPercent = calculateDailyPnLPercent(snapshots)
 
             PerformanceMetrics(
                 totalReturn = currentValue - initialValue,
@@ -64,11 +59,109 @@ class PerformanceCalculator @Inject constructor() {
     }
 
     /**
-     * Calculate ROI
+     * Calculate daily P&L with proper 24-hour time period validation
+     *
+     * BUG FIX 9.1: This now validates that snapshots are actually 24 hours apart
+     * instead of just taking the last 2 snapshots.
+     *
+     * @param snapshots List of portfolio snapshots ordered by timestamp
+     * @return Daily P&L amount
      */
-    fun calculateROI(gains: Double, costs: Double): Double {
-        if (costs == 0.0) return 0.0
-        return ((gains - costs) / costs) * 100.0
+    fun calculateDailyPnL(snapshots: List<PortfolioSnapshot>): Double {
+        if (snapshots.isEmpty()) {
+            Timber.d("No snapshots available for daily P&L calculation")
+            return 0.0
+        }
+
+        val now = System.currentTimeMillis()
+        val oneDayAgo = now - (24 * 60 * 60 * 1000)
+
+        // Get snapshot from 24 hours ago (or closest before that)
+        val startSnapshot = snapshots.lastOrNull { it.timestamp <= oneDayAgo }
+        val endSnapshot = snapshots.lastOrNull()
+
+        return if (startSnapshot != null && endSnapshot != null) {
+            val pnl = endSnapshot.totalValue - startSnapshot.totalValue
+            val hoursDiff = (endSnapshot.timestamp - startSnapshot.timestamp) / (60 * 60 * 1000.0)
+
+            Timber.d("Daily P&L: Start=${startSnapshot.totalValue} (${java.util.Date(startSnapshot.timestamp)}), " +
+                    "End=${endSnapshot.totalValue} (${java.util.Date(endSnapshot.timestamp)}), " +
+                    "Hours=${"%.1f".format(hoursDiff)}, P&L=${"%.2f".format(pnl)}")
+
+            // Validate the time period is reasonable (at least 20 hours to count as "daily")
+            if (hoursDiff < 20.0) {
+                Timber.w("Insufficient time period for daily P&L: ${"%.1f".format(hoursDiff)} hours")
+                return 0.0
+            }
+
+            pnl
+        } else {
+            Timber.w("Not enough snapshots for 24-hour P&L calculation (start=${startSnapshot != null}, end=${endSnapshot != null})")
+            0.0
+        }
+    }
+
+    /**
+     * Calculate daily P&L percentage with proper 24-hour time period validation
+     *
+     * @param snapshots List of portfolio snapshots ordered by timestamp
+     * @return Daily P&L percentage
+     */
+    fun calculateDailyPnLPercent(snapshots: List<PortfolioSnapshot>): Double {
+        if (snapshots.isEmpty()) return 0.0
+
+        val now = System.currentTimeMillis()
+        val oneDayAgo = now - (24 * 60 * 60 * 1000)
+
+        // Get snapshot from 24 hours ago (or closest before that)
+        val startSnapshot = snapshots.lastOrNull { it.timestamp <= oneDayAgo }
+        val endSnapshot = snapshots.lastOrNull()
+
+        return if (startSnapshot != null && endSnapshot != null && startSnapshot.totalValue > 0) {
+            val pnl = endSnapshot.totalValue - startSnapshot.totalValue
+            val pnlPercent = (pnl / startSnapshot.totalValue) * 100.0
+
+            val hoursDiff = (endSnapshot.timestamp - startSnapshot.timestamp) / (60 * 60 * 1000.0)
+
+            // Validate the time period is reasonable
+            if (hoursDiff < 20.0) {
+                Timber.w("Insufficient time period for daily P&L %: ${"%.1f".format(hoursDiff)} hours")
+                return 0.0
+            }
+
+            Timber.d("Daily P&L %: ${"%.2f".format(pnlPercent)}% over ${"%.1f".format(hoursDiff)} hours")
+            pnlPercent
+        } else {
+            0.0
+        }
+    }
+
+    /**
+     * Calculate Return on Investment (ROI)
+     *
+     * BUG FIX 9.2: Renamed parameters for clarity - finalValue and initialValue
+     * instead of confusing gains and costs.
+     *
+     * @param finalValue The final portfolio value
+     * @param initialValue The initial investment amount
+     * @return ROI as a percentage
+     */
+    fun calculateROI(finalValue: Double, initialValue: Double): Double {
+        if (initialValue == 0.0) {
+            Timber.w("ROI calculation: Initial value is 0, returning 0%")
+            return 0.0
+        }
+
+        val roi = ((finalValue - initialValue) / initialValue) * 100.0
+
+        Timber.d("ROI: Initial=${"%.2f".format(initialValue)}, Final=${"%.2f".format(finalValue)}, ROI=${"%.2f".format(roi)}%")
+
+        // Validate ROI is within reasonable bounds (-100% to +10000%)
+        if (roi < -100.0 || roi > 10000.0) {
+            Timber.w("ROI value seems unreasonable: ${"%.2f".format(roi)}%")
+        }
+
+        return roi
     }
 
     /**

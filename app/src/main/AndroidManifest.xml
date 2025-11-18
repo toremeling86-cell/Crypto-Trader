@@ -9,9 +9,18 @@
     <!-- WorkManager permissions -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Notification permissions (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- File access permissions for expert report monitoring -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- Android 13+ (API 33) requires granular media permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_DOCUMENTS" />
 
     <application
         android:name=".CryptoTraderApplication"
@@ -35,6 +44,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Backtest Test Activity -->
+        <activity
+            android:name=".ui.backtest.BacktestTestActivity"
+            android:exported="true"
+            android:theme="@style/Theme.CryptoTrader"
+            android:label="Backtest Test">
+        </activity>
+
+        <!-- Auto-Trading Foreground Service -->
+        <service
+            android:name=".services.AutoTradingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- WorkManager initialization -->
         <provider

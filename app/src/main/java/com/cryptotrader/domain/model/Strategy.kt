@@ -1,5 +1,7 @@
 package com.cryptotrader.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Domain model for a trading strategy
  */
@@ -14,6 +16,7 @@ data class Strategy(
     val takeProfitPercent: Double,
     val tradingPairs: List<String>,
     val isActive: Boolean = false,
+    val tradingMode: TradingMode = TradingMode.INACTIVE, // INACTIVE, PAPER, LIVE
     val createdAt: Long = System.currentTimeMillis(),
     val lastExecuted: Long? = null,
     val totalTrades: Int = 0,
@@ -38,7 +41,33 @@ data class Strategy(
     val atrMultiplier: Double = 2.0, // ATR multiplier for stop-loss distance (1.0-4.0)
     // Market regime filtering
     val useRegimeFilter: Boolean = false,
-    val allowedRegimes: List<String> = listOf("TRENDING_BULLISH", "TRENDING_BEARISH") // Which regimes to trade in
+    val allowedRegimes: List<String> = listOf("TRENDING_BULLISH", "TRENDING_BEARISH"), // Which regimes to trade in
+
+    // Phase 3C: Performance Tracking & Strategy Lineage
+    val metaAnalysisId: Long? = null, // Link to meta-analysis that created this strategy
+    val sourceReportCount: Int = 0, // How many expert reports went into creating this
+    val maxDrawdown: Double = 0.0, // Maximum drawdown percentage
+    val avgWinAmount: Double = 0.0, // Average winning trade amount
+    val avgLossAmount: Double = 0.0, // Average losing trade amount
+    val profitFactor: Double = 0.0, // Total wins / Total losses
+    val sharpeRatio: Double? = null, // Risk-adjusted return metric
+    val largestWin: Double = 0.0, // Largest single winning trade
+    val largestLoss: Double = 0.0, // Largest single losing trade
+    val currentStreak: Int = 0, // Current win/loss streak (positive = wins, negative = losses)
+    val longestWinStreak: Int = 0, // Longest consecutive win streak
+    val longestLossStreak: Int = 0, // Longest consecutive loss streak
+    val performanceScore: Double = 0.0, // Composite performance metric (0.0-100.0)
+    val isTopPerformer: Boolean = false, // Flag for top 10% performing strategies
+    val totalProfitPercent: Double = 0.0, // Total profit as percentage
+
+    // Kraken Order Execution Settings
+    val postOnly: Boolean = false, // Only place maker orders (lower fees, may be rejected)
+    val timeInForce: TimeInForce = TimeInForce.GTC, // Order time-in-force behavior
+    val orderExpiration: Long? = null, // Expiration timestamp for GTD orders (milliseconds)
+    val feeAsset: FeeAsset = FeeAsset.QUOTE, // Prefer fees in base or quote currency
+    val maxLeverage: Int? = null, // Maximum leverage to use (null = no leverage, 2-5 for margin)
+    val useNativeTrailingStop: Boolean = false, // Use Kraken's native trailing stops vs app-based
+    val volumeInQuote: Boolean = false // For market buy orders: specify volume in quote currency
 )
 
 enum class ApprovalStatus {
@@ -56,6 +85,7 @@ enum class StrategySource {
     override fun toString(): String = name
 }
 
+@Serializable
 enum class RiskLevel {
     LOW, MEDIUM, HIGH;
 
@@ -68,6 +98,57 @@ enum class RiskLevel {
                 "MEDIUM" -> MEDIUM
                 "HIGH" -> HIGH
                 else -> MEDIUM
+            }
+        }
+    }
+}
+
+/**
+ * Time-in-force for orders
+ */
+@Serializable
+enum class TimeInForce {
+    GTC,  // Good Till Canceled - remains until filled or cancelled (default)
+    IOC,  // Immediate Or Cancel - fill immediately, cancel remainder
+    GTD;  // Good Till Date - expires at specified time (requires orderExpiration)
+
+    override fun toString(): String = name
+
+    fun toKrakenFormat(): String = name.lowercase()
+
+    companion object {
+        fun fromString(value: String): TimeInForce {
+            return when (value.uppercase()) {
+                "GTC" -> GTC
+                "IOC" -> IOC
+                "GTD" -> GTD
+                else -> GTC
+            }
+        }
+    }
+}
+
+/**
+ * Fee currency preference for orders
+ */
+@Serializable
+enum class FeeAsset {
+    BASE,   // Fee charged in base currency (e.g., BTC for XBTUSD)
+    QUOTE;  // Fee charged in quote currency (e.g., USD for XBTUSD) - default
+
+    override fun toString(): String = name
+
+    fun toKrakenFlag(): String = when (this) {
+        BASE -> "fcib"
+        QUOTE -> "fciq"
+    }
+
+    companion object {
+        fun fromString(value: String): FeeAsset {
+            return when (value.uppercase()) {
+                "BASE" -> BASE
+                "QUOTE" -> QUOTE
+                else -> QUOTE
             }
         }
     }
@@ -89,4 +170,27 @@ data class TradeSignal(
 
 enum class TradeAction {
     BUY, SELL, HOLD
+}
+
+/**
+ * Trading mode for strategies
+ */
+@Serializable
+enum class TradingMode {
+    INACTIVE,  // Strategy saved but not running
+    PAPER,     // Simulated trading with fake money
+    LIVE;      // Real trading with real money
+
+    override fun toString(): String = name
+
+    companion object {
+        fun fromString(value: String): TradingMode {
+            return when (value.uppercase()) {
+                "INACTIVE" -> INACTIVE
+                "PAPER" -> PAPER
+                "LIVE" -> LIVE
+                else -> INACTIVE
+            }
+        }
+    }
 }

@@ -6,6 +6,7 @@ import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -17,6 +18,9 @@ import javax.crypto.spec.SecretKeySpec
 object CryptoUtils {
 
     private const val PREFERENCES_NAME = "crypto_trader_encrypted"
+
+    // Thread-safe counter for nonce generation to prevent collisions
+    private val nonceCounter = AtomicLong(0)
 
     /**
      * Generate HMAC-SHA512 signature for Kraken API authentication
@@ -61,10 +65,21 @@ object CryptoUtils {
     }
 
     /**
-     * Generate current nonce (milliseconds since epoch)
-     * Each request must have a unique, increasing nonce
+     * Generate current nonce with microsecond precision and counter
+     *
+     * Kraken requires strictly increasing nonces. Using milliseconds alone
+     * can cause collisions in high-frequency scenarios.
+     *
+     * Format: {timestamp_ms}{counter_6_digits}
+     * Example: 1699876543210000123
+     *
+     * Each request must have a unique, increasing nonce.
      */
-    fun generateNonce(): String = System.currentTimeMillis().toString()
+    fun generateNonce(): String {
+        val timestamp = System.currentTimeMillis()
+        val counter = nonceCounter.getAndIncrement()
+        return "${timestamp}${counter.toString().padStart(6, '0')}"
+    }
 
     /**
      * Initialize encrypted SharedPreferences for secure credential storage

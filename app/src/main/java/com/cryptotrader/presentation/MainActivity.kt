@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.SmartToy
@@ -115,6 +117,20 @@ fun BottomNavigationBar(
             label = { Text("AI", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             alwaysShowLabel = false
         )
+        // TEMPORARILY DISABLED - Learning section has compilation errors
+        /*
+        NavigationBarItem(
+            selected = currentRoute == Screen.Learning.route ||
+                       currentRoute == Screen.Library.route ||
+                       currentRoute == Screen.KnowledgeBase.route ||
+                       currentRoute?.startsWith("book_detail/") == true ||
+                       currentRoute?.startsWith("study_plan/") == true,
+            onClick = { onNavigate(Screen.Learning.route) },
+            icon = { Icon(Icons.Default.School, contentDescription = null) },
+            label = { Text("Learn", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
+        )
+        */
         NavigationBarItem(
             selected = currentRoute == Screen.Portfolio.route,
             onClick = { onNavigate(Screen.Portfolio.route) },

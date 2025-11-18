@@ -10,10 +10,28 @@ import java.util.*
  * Extension functions for common operations
  */
 
-// Format BigDecimal as currency
+// Format Double as currency (EUR by default to match Kraken)
 fun Double.formatCurrency(): String {
-    val formatter = NumberFormat.getCurrencyInstance(Locale.US)
+    val formatter = NumberFormat.getCurrencyInstance(Locale.GERMANY) // EUR format
     return formatter.format(this)
+}
+
+// Format Double as currency with specific currency type
+fun Double.formatCurrency(currency: com.cryptotrader.data.preferences.Currency): String {
+    return when (currency) {
+        com.cryptotrader.data.preferences.Currency.USD -> {
+            val formatter = NumberFormat.getCurrencyInstance(Locale.US)
+            formatter.format(this)
+        }
+        com.cryptotrader.data.preferences.Currency.EUR -> {
+            val formatter = NumberFormat.getCurrencyInstance(Locale.GERMANY) // EUR format
+            formatter.format(this)
+        }
+        com.cryptotrader.data.preferences.Currency.NOK -> {
+            val formatter = NumberFormat.getCurrencyInstance(Locale("no", "NO")) // NOK format
+            formatter.format(this)
+        }
+    }
 }
 
 // Format Double as percentage

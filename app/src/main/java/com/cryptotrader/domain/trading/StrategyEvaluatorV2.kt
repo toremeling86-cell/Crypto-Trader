@@ -80,32 +80,97 @@ class StrategyEvaluatorV2 @Inject constructor(
     /**
      * Evaluate entry conditions for a strategy
      *
+     * CRITICAL: Prevents look-ahead bias in backtesting
+     *
+     * When isBacktesting=true, only uses COMPLETED candles (excludes current incomplete candle)
+     * to prevent seeing future data. This ensures backtest results match live trading performance.
+     *
      * @param strategy Strategy containing entry conditions
      * @param marketData Current market ticker data
+     * @param isBacktesting If true, excludes current candle from calculations (prevents look-ahead bias)
      * @return True if all entry conditions are met, false otherwise
      */
     fun evaluateEntryConditions(
         strategy: Strategy,
-        marketData: MarketTicker
+        marketData: MarketTicker,
+        isBacktesting: Boolean = false
     ): Boolean {
         return try {
-            // Update price history with latest data
-            updatePriceHistory(marketData.pair, marketData)
+            if (isBacktesting) {
+                // BACKTEST MODE: Use only COMPLETED candles (exclude current)
+                // Do NOT update price history with current candle - it's incomplete!
+                val candles = priceHistoryManager.getHistory(marketData.pair)
 
-            // Get candle history
-            val candles = priceHistoryManager.getHistory(marketData.pair)
-            if (candles.size < MIN_HISTORY_SIZE) {
-                Timber.d("[$TAG] Not enough history for ${marketData.pair}: ${candles.size}/$MIN_HISTORY_SIZE")
-                return false
+                if (candles.size < MIN_HISTORY_SIZE) {
+                    Timber.d("[$TAG] BACKTEST: Not enough history for ${marketData.pair}: ${candles.size}/$MIN_HISTORY_SIZE")
+                    return false
+                }
+
+                Timber.d("[$TAG] BACKTEST MODE: Evaluating ${strategy.name} with ${candles.size} COMPLETED candles only (excluding current)")
+                if (candles.isNotEmpty()) {
+                    Timber.d("[$TAG] BACKTEST: Last completed candle timestamp: ${candles.last().timestamp}")
+                }
+
+                // Evaluate all entry conditions using ONLY completed candles
+                val conditionResults = mutableListOf<Pair<String, Boolean>>()
+                val result = strategy.entryConditions.all { condition ->
+                    val conditionResult = evaluateCondition(
+                        condition = condition,
+                        marketData = marketData,
+                        candles = candles,
+                        useCompletedOnly = true  // CRITICAL: Only use completed candles
+                    )
+                    conditionResults.add(Pair(condition, conditionResult))
+                    conditionResult
+                }
+
+                // Log detailed results
+                if (!result || candles.size <= MIN_HISTORY_SIZE + 5) {
+                    Timber.i("[$TAG] BACKTEST Entry evaluation for ${strategy.name} (${candles.size} completed candles): $result")
+                    conditionResults.forEach { (condition, condResult) ->
+                        Timber.i("[$TAG]   - '$condition' = $condResult")
+                    }
+                }
+
+                result
+
+            } else {
+                // LIVE TRADING MODE: Can use current candle
+                // Update price history with latest data
+                updatePriceHistory(marketData.pair, marketData)
+
+                // Get candle history
+                val candles = priceHistoryManager.getHistory(marketData.pair)
+                if (candles.size < MIN_HISTORY_SIZE) {
+                    Timber.d("[$TAG] LIVE: Not enough history for ${marketData.pair}: ${candles.size}/$MIN_HISTORY_SIZE")
+                    return false
+                }
+
+                Timber.d("[$TAG] LIVE MODE: Evaluating ${strategy.name} with ${candles.size} candles (including current)")
+
+                // Evaluate all entry conditions (ALL must be true)
+                val conditionResults = mutableListOf<Pair<String, Boolean>>()
+                val result = strategy.entryConditions.all { condition ->
+                    val conditionResult = evaluateCondition(
+                        condition = condition,
+                        marketData = marketData,
+                        candles = candles,
+                        useCompletedOnly = false  // Can use current candle in live trading
+                    )
+                    conditionResults.add(Pair(condition, conditionResult))
+                    conditionResult
+                }
+
+                // Log detailed results
+                if (!result || candles.size <= MIN_HISTORY_SIZE + 5) {
+                    Timber.i("[$TAG] LIVE Entry evaluation for ${strategy.name} (${candles.size} candles): $result")
+                    conditionResults.forEach { (condition, condResult) ->
+                        Timber.i("[$TAG]   - '$condition' = $condResult")
+                    }
+                }
+
+                result
             }
-
-            // Evaluate all entry conditions (ALL must be true)
-            val result = strategy.entryConditions.all { condition ->
-                evaluateCondition(condition, marketData, candles)
-            }
-
-            Timber.d("[$TAG] Entry conditions for ${strategy.name} on ${marketData.pair}: $result")
-            result
 
         } catch (e: Exception) {
             Timber.e(e, "[$TAG] Error evaluating entry conditions")
@@ -161,41 +226,43 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @param condition Condition string to evaluate
      * @param marketData Current market ticker data
      * @param candles Historical candle data
+     * @param useCompletedOnly If true, excludes last candle (for backtesting to prevent look-ahead bias)
      * @return True if condition is met, false otherwise
      */
     private fun evaluateCondition(
         condition: String,
         marketData: MarketTicker,
-        candles: List<Candle>
+        candles: List<Candle>,
+        useCompletedOnly: Boolean = false
     ): Boolean {
         val normalizedCondition = condition.trim().lowercase()
 
         return try {
             val result = when {
                 // RSI conditions
-                normalizedCondition.contains("rsi") -> evaluateRSI(normalizedCondition, candles)
+                normalizedCondition.contains("rsi") -> evaluateRSI(normalizedCondition, candles, useCompletedOnly)
+
+                // MACD conditions (check BEFORE "ma" to avoid false matches since "macd" contains "ma")
+                normalizedCondition.contains("macd") -> evaluateMACD(normalizedCondition, candles, useCompletedOnly)
 
                 // EMA conditions (check before "ma" to avoid false matches)
                 normalizedCondition.contains("ema") -> {
-                    evaluateExponentialMovingAverage(normalizedCondition, candles, marketData.last)
+                    evaluateExponentialMovingAverage(normalizedCondition, candles, marketData.last, useCompletedOnly)
                 }
 
                 // Moving Average conditions (SMA)
                 normalizedCondition.contains("sma") || normalizedCondition.contains("ma") -> {
-                    evaluateMovingAverage(normalizedCondition, candles, marketData.last)
+                    evaluateMovingAverage(normalizedCondition, candles, marketData.last, useCompletedOnly)
                 }
-
-                // MACD conditions
-                normalizedCondition.contains("macd") -> evaluateMACD(normalizedCondition, candles)
 
                 // Bollinger Bands conditions
                 normalizedCondition.contains("bollinger") -> {
-                    evaluateBollingerBands(normalizedCondition, candles, marketData.last)
+                    evaluateBollingerBands(normalizedCondition, candles, marketData.last, useCompletedOnly)
                 }
 
                 // ATR (Average True Range) conditions
                 normalizedCondition.contains("atr") -> {
-                    evaluateATR(normalizedCondition, candles, marketData)
+                    evaluateATR(normalizedCondition, candles, marketData, useCompletedOnly)
                 }
 
                 // Price momentum conditions
@@ -205,7 +272,7 @@ class StrategyEvaluatorV2 @Inject constructor(
 
                 // Volume conditions
                 normalizedCondition.contains("volume") -> {
-                    evaluateVolume(normalizedCondition, marketData, candles)
+                    evaluateVolume(normalizedCondition, marketData, candles, useCompletedOnly)
                 }
 
                 // Price position conditions
@@ -239,10 +306,20 @@ class StrategyEvaluatorV2 @Inject constructor(
      *
      * @param condition Condition string (e.g., "RSI < 30")
      * @param candles Historical candle data
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if RSI condition is met
      */
-    private fun evaluateRSI(condition: String, candles: List<Candle>): Boolean {
-        val closes = candles.map { it.close }
+    private fun evaluateRSI(condition: String, candles: List<Candle>, useCompletedOnly: Boolean = false): Boolean {
+        // Exclude current incomplete candle if in backtest mode
+        val candlesToUse = if (useCompletedOnly && candles.size > 14) {
+            candles.dropLast(1)
+        } else {
+            candles
+        }
+
+        if (candlesToUse.size < 14) return false  // Need at least 14 candles for RSI
+
+        val closes = candlesToUse.map { it.close }
         val rsiValues = rsiCalculator.calculate(closes, period = 14)
         val rsi = rsiValues.lastOrNull() ?: return false
 
@@ -252,11 +329,13 @@ class StrategyEvaluatorV2 @Inject constructor(
 
         return when {
             condition.contains("<") -> {
-                val threshold = extractNumber(condition) ?: 30.0
+                val threshold = extractThreshold(condition) ?: 30.0
+                Timber.d("[$TAG] RSI comparison: $rsi < $threshold = ${rsi < threshold}")
                 rsi < threshold
             }
             condition.contains(">") -> {
-                val threshold = extractNumber(condition) ?: 70.0
+                val threshold = extractThreshold(condition) ?: 70.0
+                Timber.d("[$TAG] RSI comparison: $rsi > $threshold = ${rsi > threshold}")
                 rsi > threshold
             }
             condition.contains("oversold") -> rsi < 30.0
@@ -271,15 +350,28 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @param condition Condition string (e.g., "SMA_20 > SMA_50")
      * @param candles Historical candle data
      * @param currentPrice Current price for comparison
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if SMA condition is met
      */
     private fun evaluateMovingAverage(
         condition: String,
         candles: List<Candle>,
-        currentPrice: Double
+        currentPrice: Double,
+        useCompletedOnly: Boolean = false
     ): Boolean {
-        val closes = candles.map { it.close }
         val numbers = Regex("\\d+").findAll(condition).map { it.value.toInt() }.toList()
+        val maxPeriod = numbers.maxOrNull() ?: 20
+
+        // Exclude current incomplete candle if in backtest mode
+        val candlesToUse = if (useCompletedOnly && candles.size > maxPeriod) {
+            candles.dropLast(1)
+        } else {
+            candles
+        }
+
+        if (candlesToUse.size < maxPeriod) return false  // Need enough candles
+
+        val closes = candlesToUse.map { it.close }
 
         return when {
             numbers.size >= 2 -> {
@@ -333,15 +425,28 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @param condition Condition string (e.g., "EMA_12 > EMA_26")
      * @param candles Historical candle data
      * @param currentPrice Current price for comparison
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if EMA condition is met
      */
     private fun evaluateExponentialMovingAverage(
         condition: String,
         candles: List<Candle>,
-        currentPrice: Double
+        currentPrice: Double,
+        useCompletedOnly: Boolean = false
     ): Boolean {
-        val closes = candles.map { it.close }
         val numbers = Regex("\\d+").findAll(condition).map { it.value.toInt() }.toList()
+        val maxPeriod = numbers.maxOrNull() ?: 26
+
+        // Exclude current incomplete candle if in backtest mode
+        val candlesToUse = if (useCompletedOnly && candles.size > maxPeriod) {
+            candles.dropLast(1)
+        } else {
+            candles
+        }
+
+        if (candlesToUse.size < maxPeriod) return false  // Need enough candles
+
+        val closes = candlesToUse.map { it.close }
 
         return when {
             numbers.size >= 2 -> {
@@ -392,10 +497,22 @@ class StrategyEvaluatorV2 @Inject constructor(
      *
      * @param condition Condition string (e.g., "MACD_crossover", "MACD > 0")
      * @param candles Historical candle data
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if MACD condition is met
      */
-    private fun evaluateMACD(condition: String, candles: List<Candle>): Boolean {
-        val closes = candles.map { it.close }
+    private fun evaluateMACD(condition: String, candles: List<Candle>, useCompletedOnly: Boolean = false): Boolean {
+        val minPeriod = 26  // MACD needs at least 26 periods
+
+        // Exclude current incomplete candle if in backtest mode
+        val candlesToUse = if (useCompletedOnly && candles.size > minPeriod) {
+            candles.dropLast(1)
+        } else {
+            candles
+        }
+
+        if (candlesToUse.size < minPeriod) return false  // Need enough candles for MACD
+
+        val closes = candlesToUse.map { it.close }
         val macdResult = macdCalculator.calculate(closes)
 
         val macdLine = macdResult.macdLine.lastOrNull() ?: return false
@@ -433,15 +550,28 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @param condition Condition string (e.g., "Price > Bollinger_Upper")
      * @param candles Historical candle data
      * @param currentPrice Current price
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if Bollinger Bands condition is met
      */
     private fun evaluateBollingerBands(
         condition: String,
         candles: List<Candle>,
-        currentPrice: Double
+        currentPrice: Double,
+        useCompletedOnly: Boolean = false
     ): Boolean {
-        val closes = candles.map { it.close }
-        val bandsResult = bollingerCalculator.calculate(closes, period = 20, stdDev = 2.0)
+        val period = 20
+
+        // Exclude current incomplete candle if in backtest mode
+        val candlesToUse = if (useCompletedOnly && candles.size > period) {
+            candles.dropLast(1)
+        } else {
+            candles
+        }
+
+        if (candlesToUse.size < period) return false  // Need enough candles
+
+        val closes = candlesToUse.map { it.close }
+        val bandsResult = bollingerCalculator.calculate(closes, period = period, stdDev = 2.0)
 
         val upper = bandsResult.upperBand.lastOrNull() ?: return false
         val middle = bandsResult.middleBand.lastOrNull() ?: return false
@@ -469,27 +599,38 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @param condition Condition string (e.g., "ATR > 2.0")
      * @param candles Historical candle data
      * @param marketData Current market data
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if ATR condition is met
      */
     private fun evaluateATR(
         condition: String,
         candles: List<Candle>,
-        marketData: MarketTicker
+        marketData: MarketTicker,
+        useCompletedOnly: Boolean = false
     ): Boolean {
-        if (candles.size < 14) return false
+        val period = 14
 
-        val highs = candles.map { it.high }
-        val lows = candles.map { it.low }
-        val closes = candles.map { it.close }
+        // Exclude current incomplete candle if in backtest mode
+        val candlesToUse = if (useCompletedOnly && candles.size > period) {
+            candles.dropLast(1)
+        } else {
+            candles
+        }
 
-        val atrValues = atrCalculator.calculate(highs, lows, closes, period = 14)
+        if (candlesToUse.size < period) return false
+
+        val highs = candlesToUse.map { it.high }
+        val lows = candlesToUse.map { it.low }
+        val closes = candlesToUse.map { it.close }
+
+        val atrValues = atrCalculator.calculate(highs, lows, closes, period = period)
         val atr = atrValues.lastOrNull() ?: return false
 
         if (FeatureFlags.LOG_CACHE_PERFORMANCE) {
             Timber.d("[$TAG] ATR calculated: $atr")
         }
 
-        val threshold = extractNumber(condition) ?: 1.0
+        val threshold = extractThreshold(condition) ?: 1.0
 
         return when {
             condition.contains(">") || condition.contains("high") -> atr > threshold
@@ -506,7 +647,7 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @return True if momentum condition is met
      */
     private fun evaluateMomentum(condition: String, marketData: MarketTicker): Boolean {
-        val threshold = extractNumber(condition) ?: 2.0
+        val threshold = extractThreshold(condition) ?: 2.0
 
         return when {
             condition.contains(">") || condition.contains("positive") -> {
@@ -525,18 +666,31 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @param condition Condition string (e.g., "Volume > average")
      * @param marketData Current market data
      * @param candles Historical candle data
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if volume condition is met
      */
     private fun evaluateVolume(
         condition: String,
         marketData: MarketTicker,
-        candles: List<Candle>
+        candles: List<Candle>,
+        useCompletedOnly: Boolean = false
     ): Boolean {
-        val volumes = candles.map { it.volume }
+        val period = 20
+
+        // Exclude current incomplete candle if in backtest mode
+        val candlesToUse = if (useCompletedOnly && candles.size > period) {
+            candles.dropLast(1)
+        } else {
+            candles
+        }
+
+        if (candlesToUse.size < period) return false
+
+        val volumes = candlesToUse.map { it.volume }
         val currentVolume = marketData.volume24h
 
         // Calculate average volume using calculator
-        val avgVolumeValues = volumeCalculator.calculateAverageVolume(volumes, period = 20)
+        val avgVolumeValues = volumeCalculator.calculateAverageVolume(volumes, period = period)
         val avgVolume = avgVolumeValues.lastOrNull() ?: currentVolume
 
         if (FeatureFlags.LOG_CACHE_PERFORMANCE) {
@@ -577,11 +731,11 @@ class StrategyEvaluatorV2 @Inject constructor(
                 currentPrice <= marketData.low24h * 1.02
             }
             condition.contains(">") -> {
-                val threshold = extractNumber(condition) ?: return false
+                val threshold = extractThreshold(condition) ?: return false
                 currentPrice > threshold
             }
             condition.contains("<") -> {
-                val threshold = extractNumber(condition) ?: return false
+                val threshold = extractThreshold(condition) ?: return false
                 currentPrice < threshold
             }
             else -> false
@@ -596,6 +750,25 @@ class StrategyEvaluatorV2 @Inject constructor(
      */
     private fun extractNumber(text: String): Double? {
         return Regex("\\d+(\\.\\d+)?").find(text)?.value?.toDoubleOrNull()
+    }
+
+    /**
+     * Extract threshold number after comparison operator
+     *
+     * For conditions like "RSI(14) > 75", this extracts 75, not 14
+     * For conditions like "ATR < 2.5", this extracts 2.5
+     *
+     * @param condition Condition string with operator (< or >)
+     * @return Threshold value or null if not found
+     */
+    private fun extractThreshold(condition: String): Double? {
+        // Find the operator first
+        val operatorIndex = condition.indexOfAny(charArrayOf('<', '>'))
+        if (operatorIndex == -1) return null
+
+        // Extract number after the operator
+        val textAfterOperator = condition.substring(operatorIndex + 1)
+        return Regex("\\d+(\\.\\d+)?").find(textAfterOperator)?.value?.toDoubleOrNull()
     }
 
     /**

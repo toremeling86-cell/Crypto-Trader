@@ -62,8 +62,14 @@ fun AIScreen() {
             Tab(
                 selected = selectedTab == 3,
                 onClick = { selectedTab = 3 },
-                text = { Text("Reports") },
+                text = { Text("Reports Library") },
                 icon = { Icon(Icons.Default.Article, contentDescription = null) }
+            )
+            Tab(
+                selected = selectedTab == 4,
+                onClick = { selectedTab = 4 },
+                text = { Text("Test Center") },
+                icon = { Icon(Icons.Default.Science, contentDescription = null) }
             )
         }
 
@@ -73,6 +79,7 @@ fun AIScreen() {
             1 -> AnalysisTab()
             2 -> StrategiesTab()
             3 -> ReportsTab()
+            4 -> TestCenterTab()
         }
     }
 }
@@ -247,37 +254,14 @@ fun StrategiesTab() {
 
 @Composable
 fun ReportsTab() {
-    // Will implement expert reports upload/analysis here
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
-    ) {
-        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.Article,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Expert Reports",
-                style = MaterialTheme.typography.headlineSmall
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Upload & analyze trading reports",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Coming soon...",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    // Use existing ReportsScreen from reports package
+    com.cryptotrader.presentation.screens.reports.ReportsScreen()
+}
+
+@Composable
+fun TestCenterTab() {
+    // Use Strategy Test Center screen
+    StrategyTestCenterScreen()
 }
 
 /**

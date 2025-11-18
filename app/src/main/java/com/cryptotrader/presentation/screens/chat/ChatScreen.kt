@@ -1,5 +1,9 @@
 package com.cryptotrader.presentation.screens.chat
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,8 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cryptotrader.domain.model.ChatMessage
 import com.cryptotrader.domain.model.Strategy
@@ -29,8 +36,31 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var messageText by remember { mutableStateOf("") }
+
+    // Request storage permission for expert report file monitoring
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // Permission granted, file monitoring will work
+        }
+    }
+
+    // Check and request permission on first composition
+    LaunchedEffect(Unit) {
+        val permission = if (Build.VERSION.SDK_INT >= 33) {
+            "android.permission.READ_MEDIA_DOCUMENTS"
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        if (ContextCompat.checkSelfPermission(context, permission) != PermissionChecker.PERMISSION_GRANTED) {
+            permissionLauncher.launch(permission)
+        }
+    }
 
     // Auto-scroll to bottom when new message arrives
     LaunchedEffect(uiState.messages.size) {
@@ -54,11 +84,22 @@ fun ChatScreen(
         }
     }
 
+    // TEMPORARILY DISABLED - Learning section
+    // Show dialogs removed (metaAnalysis functionality)
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("AI Trading Assistent") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("AI Trading Assistent")
+                        if (uiState.unanalyzedReportCount > 0) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            PulsingGreenBadge(count = uiState.unanalyzedReportCount)
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, "Tilbake")
@@ -93,6 +134,8 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
+            // TEMPORARILY DISABLED - Learning section meta-analysis button removed
+
             items(uiState.messages) { message ->
                 ChatBubble(
                     message = message,

@@ -286,6 +286,71 @@ class StrategyViewModel @Inject constructor(
     }
 
     /**
+     * Set trading mode for a strategy (INACTIVE, PAPER, LIVE)
+     */
+    fun setTradingMode(strategyId: String, mode: com.cryptotrader.domain.model.TradingMode) {
+        viewModelScope.launch {
+            try {
+                val strategy = strategyRepository.getStrategyById(strategyId)
+                if (strategy == null) {
+                    Timber.e("Strategy not found: $strategyId")
+                    return@launch
+                }
+
+                // Update strategy with new trading mode
+                val updatedStrategy = strategy.copy(
+                    tradingMode = mode,
+                    isActive = mode != com.cryptotrader.domain.model.TradingMode.INACTIVE
+                )
+
+                strategyRepository.updateStrategy(updatedStrategy)
+
+                Timber.i("🎯 Strategy ${strategy.name} set to ${mode.name} mode")
+
+                // Start or stop AutoTradingService
+                updateAutoTradingService()
+
+                // Show success message
+                val modeText = when (mode) {
+                    com.cryptotrader.domain.model.TradingMode.INACTIVE -> "deaktivert"
+                    com.cryptotrader.domain.model.TradingMode.PAPER -> "Paper Trading"
+                    com.cryptotrader.domain.model.TradingMode.LIVE -> "Live Trading"
+                }
+                _uiState.value = _uiState.value.copy(
+                    successMessage = "Strategi satt til $modeText"
+                )
+
+            } catch (e: Exception) {
+                Timber.e(e, "Error setting trading mode")
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Kunne ikke endre trading mode: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Start or stop AutoTradingService based on active strategies
+     */
+    private suspend fun updateAutoTradingService() {
+        try {
+            val activeStrategies = strategyRepository.getActiveStrategies().first()
+
+            if (activeStrategies.isEmpty()) {
+                // No active strategies -> stop service
+                com.cryptotrader.services.AutoTradingService.stop(application)
+                Timber.i("🛑 AutoTradingService stopped (no active strategies)")
+            } else {
+                // Has active strategies -> start service
+                com.cryptotrader.services.AutoTradingService.start(application)
+                Timber.i("🚀 AutoTradingService started (${activeStrategies.size} active strategies)")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error updating AutoTradingService")
+        }
+    }
+
+    /**
      * Start trading worker if there are active strategies
      */
     private fun startTradingWorkerIfNeeded() {

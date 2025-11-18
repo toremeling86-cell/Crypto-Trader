@@ -32,11 +32,17 @@ class TradingEngine @Inject constructor(
 
     /**
      * Evaluate a strategy against current market data and generate trade signal
+     *
+     * @param strategy Trading strategy to evaluate
+     * @param marketData Current market data
+     * @param portfolio Current portfolio state
+     * @param isBacktesting If true, prevents look-ahead bias by using only completed candles
      */
     suspend fun evaluateStrategy(
         strategy: Strategy,
         marketData: MarketTicker,
-        portfolio: Portfolio
+        portfolio: Portfolio,
+        isBacktesting: Boolean = false
     ): TradeSignal? {
         try {
             // Check if strategy is active
@@ -60,13 +66,13 @@ class TradingEngine @Inject constructor(
             }
 
             // Evaluate entry conditions with multi-timeframe analysis
-            val shouldEnter = evaluateEntryConditionsWithTimeframes(strategy, marketData)
+            val shouldEnter = evaluateEntryConditionsWithTimeframes(strategy, marketData, isBacktesting)
             if (shouldEnter.shouldEnter) {
                 return generateBuySignal(strategy, marketData, portfolio, shouldEnter.confidence)
             }
 
             // Evaluate exit conditions
-            val shouldExit = evaluateExitConditions(strategy, marketData)
+            val shouldExit = evaluateExitConditions(strategy, marketData, isBacktesting)
             if (shouldExit) {
                 return generateSellSignal(strategy, marketData, portfolio)
             }
@@ -83,14 +89,15 @@ class TradingEngine @Inject constructor(
      */
     private suspend fun evaluateEntryConditionsWithTimeframes(
         strategy: Strategy,
-        marketData: MarketTicker
+        marketData: MarketTicker,
+        isBacktesting: Boolean = false
     ): MultiTimeframeResult {
         return if (strategy.useMultiTimeframe) {
             // Use multi-timeframe analysis for higher accuracy
             multiTimeframeAnalyzer.evaluateMultiTimeframe(strategy, marketData.pair, marketData)
         } else {
             // Fall back to single timeframe evaluation
-            val result = evaluateEntryConditions(strategy, marketData)
+            val result = evaluateEntryConditions(strategy, marketData, isBacktesting)
             MultiTimeframeResult(
                 shouldEnter = result,
                 confirmedTimeframes = if (result) listOf(60) else emptyList(),
@@ -108,11 +115,13 @@ class TradingEngine @Inject constructor(
      */
     private fun getActiveEvaluatorEntryConditions(
         strategy: Strategy,
-        marketData: MarketTicker
+        marketData: MarketTicker,
+        isBacktesting: Boolean = false
     ): Boolean {
         return if (FeatureFlags.USE_ADVANCED_INDICATORS) {
-            Timber.d("Using StrategyEvaluatorV2 for entry conditions")
-            strategyEvaluatorV2.evaluateEntryConditions(strategy, marketData)
+            val mode = if (isBacktesting) "BACKTEST" else "LIVE"
+            Timber.d("Using StrategyEvaluatorV2 for entry conditions ($mode mode)")
+            strategyEvaluatorV2.evaluateEntryConditions(strategy, marketData, isBacktesting)
         } else {
             Timber.d("Using StrategyEvaluator V1 for entry conditions")
             strategyEvaluator.evaluateEntryConditions(strategy, marketData)
@@ -124,10 +133,12 @@ class TradingEngine @Inject constructor(
      */
     private fun getActiveEvaluatorExitConditions(
         strategy: Strategy,
-        marketData: MarketTicker
+        marketData: MarketTicker,
+        isBacktesting: Boolean = false
     ): Boolean {
         return if (FeatureFlags.USE_ADVANCED_INDICATORS) {
-            Timber.d("Using StrategyEvaluatorV2 for exit conditions")
+            val mode = if (isBacktesting) "BACKTEST" else "LIVE"
+            Timber.d("Using StrategyEvaluatorV2 for exit conditions ($mode mode)")
             strategyEvaluatorV2.evaluateExitConditions(strategy, marketData)
         } else {
             Timber.d("Using StrategyEvaluator V1 for exit conditions")
@@ -137,26 +148,42 @@ class TradingEngine @Inject constructor(
 
     private fun evaluateEntryConditions(
         strategy: Strategy,
-        marketData: MarketTicker
+        marketData: MarketTicker,
+        isBacktesting: Boolean = false
     ): Boolean {
         // Use active strategy evaluator (V1 or V2 based on feature flag)
-        return getActiveEvaluatorEntryConditions(strategy, marketData)
+        return getActiveEvaluatorEntryConditions(strategy, marketData, isBacktesting)
     }
 
     private fun evaluateExitConditions(
         strategy: Strategy,
-        marketData: MarketTicker
+        marketData: MarketTicker,
+        isBacktesting: Boolean = false
     ): Boolean {
         // Use active strategy evaluator (V1 or V2 based on feature flag)
-        return getActiveEvaluatorExitConditions(strategy, marketData)
+        return getActiveEvaluatorExitConditions(strategy, marketData, isBacktesting)
     }
 
-    private fun generateBuySignal(
+    private suspend fun generateBuySignal(
         strategy: Strategy,
         marketData: MarketTicker,
         portfolio: Portfolio,
         confidence: Double = 0.75
     ): TradeSignal {
+        // Guard against zero/invalid ask price
+        if (marketData.ask <= 0.0) {
+            Timber.w("Invalid ask price (${marketData.ask}) for ${marketData.pair}, cannot generate buy signal")
+            return TradeSignal(
+                strategyId = strategy.id,
+                pair = marketData.pair,
+                action = TradeAction.BUY,
+                confidence = 0.0,
+                targetPrice = 0.0,
+                suggestedVolume = 0.0,
+                reason = "Invalid market data: ask price is ${marketData.ask}"
+            )
+        }
+
         // Calculate position size
         val positionValue = portfolio.availableBalance * (strategy.positionSizePercent / 100.0)
         val volume = positionValue / marketData.ask
@@ -191,11 +218,19 @@ class TradingEngine @Inject constructor(
         marketData: MarketTicker,
         portfolio: Portfolio
     ): TradeSignal? {
+        // Extract base asset from Kraken trading pair using proper parser
+        val (baseAsset, _) = try {
+            com.cryptotrader.utils.KrakenAssetMapper.extractAssets(marketData.pair)
+        } catch (e: IllegalArgumentException) {
+            Timber.w("Cannot parse pair ${marketData.pair} for sell signal: ${e.message}")
+            return null
+        }
+
         // Check if we have positions to sell
-        val assetName = marketData.pair.substring(0, 3) // Simplified
-        val assetBalance = portfolio.balances[assetName]
+        val assetBalance = portfolio.balances[baseAsset]
 
         if (assetBalance == null || assetBalance.balance <= 0) {
+            Timber.d("No $baseAsset balance to sell (pair: ${marketData.pair})")
             return null
         }
 
@@ -231,5 +266,45 @@ class TradingEngine @Inject constructor(
         }
 
         return signals
+    }
+
+    /**
+     * Update price history for backtesting
+     *
+     * This allows BacktestEngine to build up historical candle data
+     * before evaluating strategies in backtest mode.
+     *
+     * @param pair Trading pair
+     * @param marketData Market data to add to history
+     */
+    fun updatePriceHistory(pair: String, marketData: MarketTicker) {
+        if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+            strategyEvaluatorV2.updatePriceHistory(pair, marketData)
+        }
+        // V1 doesn't use price history manager
+    }
+
+    /**
+     * Clear price history for a trading pair
+     *
+     * Useful when starting a new backtest to ensure clean state
+     *
+     * @param pair Trading pair to clear history for
+     */
+    fun clearPriceHistory(pair: String) {
+        if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+            strategyEvaluatorV2.clearHistory(pair)
+        }
+    }
+
+    /**
+     * Clear all price history
+     *
+     * Useful when starting a new backtest to ensure clean state
+     */
+    fun clearAllPriceHistory() {
+        if (FeatureFlags.USE_ADVANCED_INDICATORS) {
+            strategyEvaluatorV2.clearHistory()
+        }
     }
 }

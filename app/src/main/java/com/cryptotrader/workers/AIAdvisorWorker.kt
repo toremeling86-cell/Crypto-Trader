@@ -424,24 +424,10 @@ class AIAdvisorWorker @AssistedInject constructor(
         }
 
         try {
-            // Create notification using existing notification manager
-            // Note: This requires extending NotificationManager with advisor-specific methods
-            Timber.i("Notification: ${opportunity.asset} ${opportunity.direction} - Confidence: ${(opportunity.confidence * 100).toInt()}%")
+            // Send notification using NotificationManager
+            notificationManager.notifyTradingOpportunity(opportunity)
 
-            // TODO: Add notificationManager.notifyTradingOpportunity() method
-            // For now, log the opportunity
-            Timber.i("""
-                Trading Opportunity:
-                Asset: ${opportunity.asset}
-                Direction: ${opportunity.direction}
-                Entry: ${opportunity.entryPrice}
-                Stop Loss: ${opportunity.stopPrice}
-                Take Profit: ${opportunity.targetPrice}
-                Confidence: ${(opportunity.confidence * 100).toInt()}%
-                Risk/Reward: ${opportunity.riskRewardRatio}:1
-                Reasoning: ${opportunity.reasoning.joinToString("; ")}
-            """.trimIndent())
-
+            Timber.i("Notification sent: ${opportunity.asset} ${opportunity.direction} - Confidence: ${(opportunity.confidence * 100).toInt()}%")
         } catch (e: Exception) {
             Timber.e(e, "Error creating opportunity notification")
         }

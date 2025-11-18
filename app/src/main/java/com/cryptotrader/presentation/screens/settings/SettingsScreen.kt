@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cryptotrader.BuildConfig
+import com.cryptotrader.presentation.components.TradingModeBanner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,6 +122,13 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Trading Mode Banner
+                    TradingModeBanner(
+                        isLiveMode = !state.isPaperTradingMode
+                    )
 
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
 

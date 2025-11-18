@@ -25,8 +25,10 @@ class RiskManager @Inject constructor(
 
     /**
      * Adjust position size based on risk parameters and Kelly Criterion (if applicable)
+     *
+     * Note: This is now a suspend function because Kelly Criterion uses actual trade history
      */
-    fun adjustPositionSize(
+    suspend fun adjustPositionSize(
         requestedVolume: Double,
         price: Double,
         availableBalance: Double,
@@ -34,11 +36,11 @@ class RiskManager @Inject constructor(
     ): Double {
         // Use Kelly Criterion if strategy has enough trade history
         val optimalValue = if (strategy.totalTrades >= 10) {
-            // Use Kelly Criterion for optimal sizing
+            // Use Kelly Criterion for optimal sizing (now uses actual trade history)
             kellyCriterionCalculator.calculatePositionSizeForStrategy(strategy, availableBalance)
         } else {
-            // Fall back to requested volume
-            requestedVolume * price
+            // Fall back to strategy's position size percentage
+            availableBalance * (strategy.positionSizePercent / 100.0)
         }
 
         // Apply maximum position size constraint
@@ -68,6 +70,12 @@ class RiskManager @Inject constructor(
         tradeValue: Double,
         portfolio: Portfolio
     ): Boolean {
+        // Guard against zero portfolio value
+        if (portfolio.totalValue <= 0.0) {
+            Timber.w("Trade rejected: Portfolio value is zero or negative")
+            return false
+        }
+
         // Check if we're within exposure limits
         val currentExposurePercent =
             ((portfolio.totalValue - portfolio.availableBalance) / portfolio.totalValue) * 100.0

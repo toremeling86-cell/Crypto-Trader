@@ -20,6 +20,14 @@ class ProfitCalculator @Inject constructor(
 ) {
 
     /**
+     * Mutable wrapper for Trade to track remaining volume in FIFO matching
+     */
+    private data class MutablePosition(
+        val trade: Trade,
+        var remainingVolume: Double
+    )
+
+    /**
      * Calculate total P&L from all trades
      * Returns: (totalPnL, totalPnLPercent, startingBalance)
      */
@@ -40,7 +48,7 @@ class ProfitCalculator @Inject constructor(
             }
 
             var totalPnL = 0.0
-            val positionsMap = mutableMapOf<String, MutableList<Trade>>() // pair -> trades
+            val positionsMap = mutableMapOf<String, MutableList<MutablePosition>>() // pair -> positions
 
             allTrades.sortedBy { it.timestamp }.forEach { tradeEntity ->
                 val trade = tradeEntity.toDomain()
@@ -48,17 +56,54 @@ class ProfitCalculator @Inject constructor(
 
                 when (trade.type) {
                     TradeType.BUY -> {
-                        // Open position
-                        positions.add(trade)
+                        // Open position - wrap trade in mutable position
+                        positions.add(MutablePosition(trade, trade.volume))
+                        Timber.d("FIFO: Added BUY position for ${trade.pair}: ${trade.volume} @ $${trade.price}")
                     }
                     TradeType.SELL -> {
-                        // Close position - calculate P&L
-                        if (positions.isNotEmpty()) {
-                            val buyTrade = positions.removeAt(0) // FIFO
-                            val pnl = (trade.price - buyTrade.price) * trade.volume - trade.fee - buyTrade.fee
+                        // Close position(s) - calculate P&L using FIFO matching
+                        var remainingVolume = trade.volume
+                        var matchedPositions = 0
+
+                        Timber.d("FIFO: Processing SELL for ${trade.pair}: ${trade.volume} @ $${trade.price}")
+
+                        while (remainingVolume > EPSILON && positions.isNotEmpty()) {
+                            val buyPosition = positions.first()
+                            val matchVolume = minOf(remainingVolume, buyPosition.remainingVolume)
+
+                            // Calculate P&L for this matched portion
+                            val proceeds = trade.price * matchVolume
+                            val cost = buyPosition.trade.price * matchVolume
+
+                            // Prorate fees based on matched volume
+                            val sellFeeForMatch = trade.fee * (matchVolume / trade.volume)
+                            val buyFeeForMatch = buyPosition.trade.fee * (matchVolume / buyPosition.trade.volume)
+
+                            val pnl = proceeds - cost - sellFeeForMatch - buyFeeForMatch
                             totalPnL += pnl
-                            Timber.d("P&L for ${trade.pair}: $${"%.2f".format(pnl)}")
+                            matchedPositions++
+
+                            Timber.d("FIFO: Matched ${matchVolume} against BUY @ $${buyPosition.trade.price}, P&L: $${"%.2f".format(pnl)}")
+
+                            // Update buy position volume
+                            buyPosition.remainingVolume -= matchVolume
+                            if (buyPosition.remainingVolume <= EPSILON) {
+                                positions.removeAt(0)
+                                Timber.d("FIFO: Fully consumed BUY position")
+                            } else {
+                                Timber.d("FIFO: Partial fill, ${buyPosition.remainingVolume} remaining")
+                            }
+
+                            remainingVolume -= matchVolume
                         }
+
+                        // Warn if sell volume exceeds available buy positions
+                        if (remainingVolume > EPSILON) {
+                            Timber.w("FIFO: SELL volume exceeds available BUY positions for ${trade.pair}. " +
+                                    "Unmatched volume: ${remainingVolume}")
+                        }
+
+                        Timber.d("FIFO: Completed SELL matching. Matched ${matchedPositions} position(s), Total P&L: $${"%.2f".format(totalPnL)}")
                     }
                 }
             }
@@ -71,6 +116,11 @@ class ProfitCalculator @Inject constructor(
             Timber.e(e, "Error calculating P&L")
             Triple(0.0, 0.0, 10000.0)
         }
+    }
+
+    companion object {
+        // Epsilon for floating point comparisons
+        private const val EPSILON = 0.00001
     }
 
     /**
@@ -89,19 +139,47 @@ class ProfitCalculator @Inject constructor(
 
             // Calculate P&L for today's trades only
             var dailyPnL = 0.0
-            val positionsMap = mutableMapOf<String, MutableList<Trade>>()
+            val positionsMap = mutableMapOf<String, MutableList<MutablePosition>>()
 
             todayTrades.sortedBy { it.timestamp }.forEach { tradeEntity ->
                 val trade = tradeEntity.toDomain()
                 val positions = positionsMap.getOrPut(trade.pair) { mutableListOf() }
 
                 when (trade.type) {
-                    TradeType.BUY -> positions.add(trade)
+                    TradeType.BUY -> {
+                        positions.add(MutablePosition(trade, trade.volume))
+                    }
                     TradeType.SELL -> {
-                        if (positions.isNotEmpty()) {
-                            val buyTrade = positions.removeAt(0)
-                            val pnl = (trade.price - buyTrade.price) * trade.volume - trade.fee - buyTrade.fee
+                        var remainingVolume = trade.volume
+
+                        while (remainingVolume > EPSILON && positions.isNotEmpty()) {
+                            val buyPosition = positions.first()
+                            val matchVolume = minOf(remainingVolume, buyPosition.remainingVolume)
+
+                            // Calculate P&L for this matched portion
+                            val proceeds = trade.price * matchVolume
+                            val cost = buyPosition.trade.price * matchVolume
+
+                            // Prorate fees based on matched volume
+                            val sellFeeForMatch = trade.fee * (matchVolume / trade.volume)
+                            val buyFeeForMatch = buyPosition.trade.fee * (matchVolume / buyPosition.trade.volume)
+
+                            val pnl = proceeds - cost - sellFeeForMatch - buyFeeForMatch
                             dailyPnL += pnl
+
+                            // Update buy position volume
+                            buyPosition.remainingVolume -= matchVolume
+                            if (buyPosition.remainingVolume <= EPSILON) {
+                                positions.removeAt(0)
+                            }
+
+                            remainingVolume -= matchVolume
+                        }
+
+                        // Warn if sell volume exceeds available buy positions
+                        if (remainingVolume > EPSILON) {
+                            Timber.w("FIFO (Daily): SELL volume exceeds available BUY positions for ${trade.pair}. " +
+                                    "Unmatched volume: ${remainingVolume}")
                         }
                     }
                 }
@@ -130,19 +208,47 @@ class ProfitCalculator @Inject constructor(
             val (_, _, startingBalance) = calculateTotalPnL()
 
             var weeklyPnL = 0.0
-            val positionsMap = mutableMapOf<String, MutableList<Trade>>()
+            val positionsMap = mutableMapOf<String, MutableList<MutablePosition>>()
 
             weekTrades.sortedBy { it.timestamp }.forEach { tradeEntity ->
                 val trade = tradeEntity.toDomain()
                 val positions = positionsMap.getOrPut(trade.pair) { mutableListOf() }
 
                 when (trade.type) {
-                    TradeType.BUY -> positions.add(trade)
+                    TradeType.BUY -> {
+                        positions.add(MutablePosition(trade, trade.volume))
+                    }
                     TradeType.SELL -> {
-                        if (positions.isNotEmpty()) {
-                            val buyTrade = positions.removeAt(0)
-                            val pnl = (trade.price - buyTrade.price) * trade.volume - trade.fee - buyTrade.fee
+                        var remainingVolume = trade.volume
+
+                        while (remainingVolume > EPSILON && positions.isNotEmpty()) {
+                            val buyPosition = positions.first()
+                            val matchVolume = minOf(remainingVolume, buyPosition.remainingVolume)
+
+                            // Calculate P&L for this matched portion
+                            val proceeds = trade.price * matchVolume
+                            val cost = buyPosition.trade.price * matchVolume
+
+                            // Prorate fees based on matched volume
+                            val sellFeeForMatch = trade.fee * (matchVolume / trade.volume)
+                            val buyFeeForMatch = buyPosition.trade.fee * (matchVolume / buyPosition.trade.volume)
+
+                            val pnl = proceeds - cost - sellFeeForMatch - buyFeeForMatch
                             weeklyPnL += pnl
+
+                            // Update buy position volume
+                            buyPosition.remainingVolume -= matchVolume
+                            if (buyPosition.remainingVolume <= EPSILON) {
+                                positions.removeAt(0)
+                            }
+
+                            remainingVolume -= matchVolume
+                        }
+
+                        // Warn if sell volume exceeds available buy positions
+                        if (remainingVolume > EPSILON) {
+                            Timber.w("FIFO (Weekly): SELL volume exceeds available BUY positions for ${trade.pair}. " +
+                                    "Unmatched volume: ${remainingVolume}")
                         }
                     }
                 }

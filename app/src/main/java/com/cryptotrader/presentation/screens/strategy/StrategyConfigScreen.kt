@@ -135,7 +135,8 @@ fun StrategyConfigScreen(
                         strategy = strategy,
                         performance = performances[strategy.id],
                         onToggle = { viewModel.toggleStrategy(strategy.id, !strategy.isActive) },
-                        onDelete = { viewModel.deleteStrategy(strategy) }
+                        onDelete = { viewModel.deleteStrategy(strategy) },
+                        onSetTradingMode = { mode -> viewModel.setTradingMode(strategy.id, mode) }
                     )
                 }
             }
@@ -148,7 +149,8 @@ fun StrategyItem(
     strategy: com.cryptotrader.domain.model.Strategy,
     performance: com.cryptotrader.domain.analytics.StrategyPerformance?,
     onToggle: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSetTradingMode: (com.cryptotrader.domain.model.TradingMode) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -171,15 +173,46 @@ fun StrategyItem(
                     )
                 }
 
-                Row {
-                    Switch(
-                        checked = strategy.isActive,
-                        onCheckedChange = { onToggle() }
-                    )
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                    }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Trading Mode Selector
+            Text(
+                text = "Trading Mode",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TradingModeButton(
+                    label = "Inactive",
+                    icon = "⏸️",
+                    isSelected = strategy.tradingMode == com.cryptotrader.domain.model.TradingMode.INACTIVE,
+                    onClick = { onSetTradingMode(com.cryptotrader.domain.model.TradingMode.INACTIVE) },
+                    modifier = Modifier.weight(1f)
+                )
+                TradingModeButton(
+                    label = "Paper",
+                    icon = "📄",
+                    isSelected = strategy.tradingMode == com.cryptotrader.domain.model.TradingMode.PAPER,
+                    onClick = { onSetTradingMode(com.cryptotrader.domain.model.TradingMode.PAPER) },
+                    modifier = Modifier.weight(1f)
+                )
+                TradingModeButton(
+                    label = "Live",
+                    icon = "💰",
+                    isSelected = strategy.tradingMode == com.cryptotrader.domain.model.TradingMode.LIVE,
+                    onClick = { onSetTradingMode(com.cryptotrader.domain.model.TradingMode.LIVE) },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -567,6 +600,46 @@ fun PendingStrategyCard(
                     Text("Avvis")
                 }
             }
+        }
+    }
+}
+
+/**
+ * Button for selecting trading mode (Inactive, Paper, Live)
+ */
+@Composable
+fun TradingModeButton(
+    label: String,
+    icon: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = when {
+                isSelected && label == "Live" -> Color(0xFF4CAF50) // Green for Live
+                isSelected && label == "Paper" -> Color(0xFF2196F3) // Blue for Paper
+                isSelected -> MaterialTheme.colorScheme.secondary
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = icon,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }

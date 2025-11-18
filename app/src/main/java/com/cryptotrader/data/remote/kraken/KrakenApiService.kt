@@ -165,15 +165,16 @@ interface KrakenApiService {
      * @param nonce Unique nonce for request
      * @param pair Asset pair (e.g., "XBTUSD")
      * @param type Order direction: "buy" or "sell"
-     * @param orderType Order type: "market", "limit", "stop-loss", "take-profit", "stop-loss-limit", "take-profit-limit"
+     * @param orderType Order type: "market", "limit", "stop-loss", "take-profit", "stop-loss-limit", "take-profit-limit", "trailing-stop", "trailing-stop-limit"
      * @param volume Order volume in lots
      * @param price Price (required for limit orders)
-     * @param price2 Secondary price (for stop-loss-limit, take-profit-limit)
+     * @param price2 Secondary price (for stop-loss-limit, take-profit-limit, trailing-stop-limit)
      * @param leverage Desired leverage amount (default: none)
-     * @param oflags Order flags: "post" (post-only), "fcib" (prefer fee in base currency), "fciq" (prefer fee in quote currency), "nompp" (no market price protection)
+     * @param oflags Order flags: "post" (post-only), "fcib" (prefer fee in base currency), "fciq" (prefer fee in quote currency), "viqc" (volume in quote currency), "nompp" (no market price protection)
+     * @param timeinforce Time-in-force: "GTC" (Good Till Canceled), "IOC" (Immediate Or Cancel), "GTD" (Good Till Date)
      * @param starttm Scheduled start time (0 for now, +<n> for offset)
-     * @param expiretm Expiration time (0 for no expiration, +<n> for offset)
-     * @param userref User reference id (32-bit signed number)
+     * @param expiretm Expiration time (0 for no expiration, +<n> for offset) - required for GTD orders
+     * @param userref User reference id (32-bit signed number) - useful for tracking orders by strategy
      * @param validate Validate inputs only, do not submit order
      */
     @FormUrlEncoded
@@ -188,6 +189,7 @@ interface KrakenApiService {
         @Field("price2") price2: String? = null,
         @Field("leverage") leverage: String? = null,
         @Field("oflags") oflags: String? = null,
+        @Field("timeinforce") timeinforce: String? = null,
         @Field("starttm") starttm: String? = null,
         @Field("expiretm") expiretm: String? = null,
         @Field("userref") userref: String? = null,
