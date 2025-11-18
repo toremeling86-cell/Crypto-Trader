@@ -38,6 +38,19 @@ regexes = [
     '''commit.*[a-f0-9]{7,40}''',         # Commit hashes with "commit" prefix
 ]
 
+# Safe stopwords - filter out common test/example patterns
+stopwords = [
+    "example",
+    "test",
+    "fake",
+    "demo",
+    "sample",
+    "placeholder",
+    "your-api-key-here",
+    "your_api_key_here",
+    "INSERT_YOUR_KEY_HERE"
+]
+
 # Allowlist commits (if needed for legacy)
 # commits = [ "commit-hash-here" ]
 
@@ -205,17 +218,4 @@ keywords = [
     "eyJ",
     "jwt",
     "token"
-]
-
-[allowlist.stopwords]
-stopwords = [
-    "example",
-    "test",
-    "fake",
-    "demo",
-    "sample",
-    "placeholder",
-    "your-api-key-here",
-    "your_api_key_here",
-    "INSERT_YOUR_KEY_HERE"
 ]
