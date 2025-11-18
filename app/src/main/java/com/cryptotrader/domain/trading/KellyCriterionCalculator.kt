@@ -1,5 +1,6 @@
 package com.cryptotrader.domain.trading
 
+import com.cryptotrader.data.repository.TradeRepository
 import com.cryptotrader.domain.model.Strategy
 import timber.log.Timber
 import javax.inject.Inject
@@ -23,7 +24,9 @@ import kotlin.math.min
  * We use fractional Kelly (default: 0.25 = Quarter Kelly) to reduce volatility
  */
 @Singleton
-class KellyCriterionCalculator @Inject constructor() {
+class KellyCriterionCalculator @Inject constructor(
+    private val tradeRepository: TradeRepository
+) {
 
     // Use fractional Kelly to reduce volatility
     private val kellyFraction = 0.25 // Quarter Kelly (conservative)
@@ -96,13 +99,18 @@ class KellyCriterionCalculator @Inject constructor() {
     /**
      * Calculate position size for a strategy based on its historical performance
      *
+     * BUG FIX 11.1: Now uses actual trade history when available for accurate
+     * Kelly Criterion calculations.
+     *
      * @param strategy Strategy with performance history
      * @param availableBalance Available balance for trading
+     * @param useActualTradeHistory Whether to use actual trade history (default: true)
      * @return Optimal position size in currency units
      */
-    fun calculatePositionSizeForStrategy(
+    suspend fun calculatePositionSizeForStrategy(
         strategy: Strategy,
-        availableBalance: Double
+        availableBalance: Double,
+        useActualTradeHistory: Boolean = true
     ): Double {
         // Check if we have enough trade history
         if (strategy.totalTrades < 10) {
@@ -114,10 +122,32 @@ class KellyCriterionCalculator @Inject constructor() {
         // Calculate average win and loss from strategy stats
         val winRate = strategy.winRate / 100.0 // Convert to decimal
 
-        // Estimate average win/loss from win rate and total profit
-        // This is a simplified calculation - in production you'd track actual avg win/loss
-        val avgWin = estimateAvgWin(strategy)
-        val avgLoss = estimateAvgLoss(strategy)
+        // Get average win/loss - prefer actual trade history over config estimates
+        val avgWin: Double
+        val avgLoss: Double
+
+        if (useActualTradeHistory) {
+            // Try to get actual values from trade history
+            val actualAvgWin = calculateActualAvgWin(strategy.id)
+            val actualAvgLoss = calculateActualAvgLoss(strategy.id)
+
+            if (actualAvgWin != null && actualAvgLoss != null) {
+                // We have actual trade history - use it!
+                avgWin = actualAvgWin
+                avgLoss = actualAvgLoss
+                Timber.i("Strategy ${strategy.name}: Using ACTUAL trade history for Kelly calculation")
+            } else {
+                // Fall back to config estimates
+                avgWin = estimateAvgWinFromConfig(strategy)
+                avgLoss = estimateAvgLossFromConfig(strategy)
+                Timber.w("Strategy ${strategy.name}: Falling back to CONFIG estimates (missing trade history)")
+            }
+        } else {
+            // Use config estimates
+            avgWin = estimateAvgWinFromConfig(strategy)
+            avgLoss = estimateAvgLossFromConfig(strategy)
+            Timber.d("Strategy ${strategy.name}: Using CONFIG estimates as requested")
+        }
 
         if (avgWin <= 0.0 || avgLoss <= 0.0) {
             // Can't calculate Kelly without win/loss data
@@ -137,30 +167,86 @@ class KellyCriterionCalculator @Inject constructor() {
         val maxStrategyPosition = availableBalance * (strategy.positionSizePercent / 100.0)
         val finalPosition = min(kellyPosition, maxStrategyPosition)
 
-        Timber.i("Strategy ${strategy.name}: Kelly=$kellyPosition, Max=$maxStrategyPosition, Final=$finalPosition")
+        Timber.i("Strategy ${strategy.name}: AvgWin=${"%.2f".format(avgWin)}%, AvgLoss=${"%.2f".format(avgLoss)}%, " +
+                "Kelly=${"%.2f".format(kellyPosition)}, Max=${"%.2f".format(maxStrategyPosition)}, " +
+                "Final=${"%.2f".format(finalPosition)}")
 
         return finalPosition
     }
 
     /**
-     * Estimate average win percentage from strategy statistics
+     * Calculate actual average win percentage from trade history
+     *
+     * BUG FIX 11.1: Now uses actual trade history instead of config values
+     * for hedge-fund quality accuracy.
+     *
+     * @param strategyId Strategy ID
+     * @return Actual average win percentage or null if no winning trades
      */
-    private fun estimateAvgWin(strategy: Strategy): Double {
+    private suspend fun calculateActualAvgWin(strategyId: String): Double? {
+        return try {
+            val avgWinPercent = tradeRepository.calculateActualAvgWinPercent(strategyId)
+
+            if (avgWinPercent != null) {
+                Timber.d("Strategy $strategyId - Actual avg win from trade history: ${"%.2f".format(avgWinPercent)}%")
+            } else {
+                Timber.d("Strategy $strategyId - No winning trades found in history")
+            }
+
+            avgWinPercent
+        } catch (e: Exception) {
+            Timber.e(e, "Error calculating actual avg win for strategy $strategyId")
+            null
+        }
+    }
+
+    /**
+     * Calculate actual average loss percentage from trade history
+     *
+     * BUG FIX 11.1: Now uses actual trade history instead of config values
+     * for hedge-fund quality accuracy.
+     *
+     * @param strategyId Strategy ID
+     * @return Actual average loss percentage (as positive number) or null if no losing trades
+     */
+    private suspend fun calculateActualAvgLoss(strategyId: String): Double? {
+        return try {
+            val avgLossPercent = tradeRepository.calculateActualAvgLossPercent(strategyId)
+
+            if (avgLossPercent != null) {
+                Timber.d("Strategy $strategyId - Actual avg loss from trade history: ${"%.2f".format(avgLossPercent)}%")
+            } else {
+                Timber.d("Strategy $strategyId - No losing trades found in history")
+            }
+
+            avgLossPercent
+        } catch (e: Exception) {
+            Timber.e(e, "Error calculating actual avg loss for strategy $strategyId")
+            null
+        }
+    }
+
+    /**
+     * Estimate average win percentage from strategy config (fallback)
+     *
+     * Used when no trade history is available.
+     */
+    private fun estimateAvgWinFromConfig(strategy: Strategy): Double {
         if (strategy.successfulTrades == 0) return 0.0
 
-        // Simplified estimation based on profit and take-profit setting
-        // In reality, you'd track actual average wins
+        Timber.w("Strategy ${strategy.id} - Using take-profit % as avg win estimate (no trade history)")
         return strategy.takeProfitPercent
     }
 
     /**
-     * Estimate average loss percentage from strategy statistics
+     * Estimate average loss percentage from strategy config (fallback)
+     *
+     * Used when no trade history is available.
      */
-    private fun estimateAvgLoss(strategy: Strategy): Double {
+    private fun estimateAvgLossFromConfig(strategy: Strategy): Double {
         if (strategy.failedTrades == 0) return 0.0
 
-        // Simplified estimation based on stop-loss setting
-        // In reality, you'd track actual average losses
+        Timber.w("Strategy ${strategy.id} - Using stop-loss % as avg loss estimate (no trade history)")
         return strategy.stopLossPercent
     }
 

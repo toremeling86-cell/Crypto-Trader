@@ -12,14 +12,27 @@ data class Portfolio(
     val dayProfit: Double,
     val dayProfitPercent: Double,
     val openPositions: Int,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    // EUR values (calculated from USD values using EUR/USD rate)
+    val totalValueEUR: Double = 0.0,
+    val availableBalanceEUR: Double = 0.0,
+    val totalProfitEUR: Double = 0.0,
+    val dayProfitEUR: Double = 0.0,
+    val eurUsdRate: Double = 1.08, // Current EUR/USD exchange rate used for conversion
+    // NOK values (calculated from USD values using USD/NOK rate)
+    val totalValueNOK: Double = 0.0,
+    val availableBalanceNOK: Double = 0.0,
+    val totalProfitNOK: Double = 0.0,
+    val dayProfitNOK: Double = 0.0,
+    val usdNokRate: Double = 10.50 // Current USD/NOK exchange rate used for conversion
 )
 
 data class AssetBalance(
     val asset: String,
     val balance: Double,
     val valueInUSD: Double,
-    val percentOfPortfolio: Double
+    val percentOfPortfolio: Double,
+    val valueInEUR: Double = 0.0 // Value in EUR (calculated from USD value)
 )
 
 /**

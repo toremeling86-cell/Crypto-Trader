@@ -30,6 +30,8 @@ class DashboardViewModel @Inject constructor(
     private val application: Application
 ) : ViewModel() {
 
+    private val currencyPreferences = com.cryptotrader.data.preferences.CurrencyPreferences(context)
+
     private val _uiState = MutableStateFlow(DashboardState())
     val uiState: StateFlow<DashboardState> = _uiState.asStateFlow()
 
@@ -111,63 +113,94 @@ class DashboardViewModel @Inject constructor(
                     var totalValueUSD = 0.0
                     var availableFunds = 0.0
 
+                    // Get EUR/USD exchange rate for conversion using correct Kraken pair name
+                    var eurUsdRate = currencyPreferences.getCachedEurUsdRate()
+                    val eurUsdPair = com.cryptotrader.utils.KrakenAssetMapper.getKrakenPair("EUR", "USD")
+                    val eurTickerResult = krakenRepository.getTicker(eurUsdPair)
+                    if (eurTickerResult.isSuccess) {
+                        eurUsdRate = eurTickerResult.getOrNull()?.last ?: eurUsdRate
+                        currencyPreferences.updateEurUsdRate(eurUsdRate)
+                    }
+
+                    // Get USD/NOK exchange rate for conversion
+                    var usdNokRate = 10.50 // Default fallback rate
+                    val usdNokPair = "USDNOK" // Kraken uses USDNOK format
+                    val nokTickerResult = krakenRepository.getTicker(usdNokPair)
+                    if (nokTickerResult.isSuccess) {
+                        usdNokRate = nokTickerResult.getOrNull()?.last ?: usdNokRate
+                    }
+
                     krakenBalances.forEach { (asset, balanceStr) ->
                         val balance = balanceStr.toDoubleOrNull() ?: 0.0
                         if (balance > 0) {
-                            // Normalize Kraken asset names (ZUSD -> USD, XXBT -> XBT)
-                            val normalizedAsset = when {
-                                asset.startsWith("Z") && asset.length == 4 -> asset.substring(1)
-                                asset.startsWith("X") && asset.length == 4 -> asset.substring(1)
-                                else -> asset
-                            }
+                            // Normalize Kraken asset names using comprehensive mapper
+                            // ZUSD -> USD, XXBT -> BTC, XETH -> ETH, etc.
+                            val normalizedAsset = com.cryptotrader.utils.KrakenAssetMapper.normalizeAsset(asset)
 
                             // Calculate value in USD
                             val valueInUSD = when (normalizedAsset) {
                                 "USD" -> balance // Already in USD
                                 "EUR" -> {
-                                    // Get EUR/USD exchange rate
-                                    val eurTickerResult = krakenRepository.getTicker("EURUSD")
-                                    if (eurTickerResult.isSuccess) {
-                                        balance * (eurTickerResult.getOrNull()?.last ?: 1.08)
-                                    } else {
-                                        balance * 1.08 // Fallback: ~1.08 USD per EUR
-                                    }
+                                    // EUR already converted above using eurUsdRate
+                                    balance * eurUsdRate
                                 }
-                                "XBT", "BTC" -> {
+                                "BTC" -> {
                                     // Get BTC price to calculate USD value
-                                    val btcTickerResult = krakenRepository.getTicker("XXBTZUSD")
+                                    val btcPair = com.cryptotrader.utils.KrakenAssetMapper.getKrakenPair("BTC", "USD")
+                                    val btcTickerResult = krakenRepository.getTicker(btcPair)
                                     if (btcTickerResult.isSuccess) {
                                         balance * (btcTickerResult.getOrNull()?.last ?: 0.0)
                                     } else {
-                                        balance * 40000.0 // Fallback estimate
+                                        Timber.w("Failed to fetch BTC price for portfolio calculation")
+                                        0.0 // Cannot calculate value without price
                                     }
                                 }
                                 "ETH" -> {
                                     // Get ETH price to calculate USD value
-                                    val ethTickerResult = krakenRepository.getTicker("XETHZUSD")
+                                    val ethPair = com.cryptotrader.utils.KrakenAssetMapper.getKrakenPair("ETH", "USD")
+                                    val ethTickerResult = krakenRepository.getTicker(ethPair)
                                     if (ethTickerResult.isSuccess) {
                                         balance * (ethTickerResult.getOrNull()?.last ?: 0.0)
                                     } else {
-                                        balance * 2500.0 // Fallback estimate
+                                        Timber.w("Failed to fetch ETH price for portfolio calculation")
+                                        0.0 // Cannot calculate value without price
                                     }
                                 }
                                 "SOL" -> {
                                     // Get SOL price to calculate USD value
-                                    val solTickerResult = krakenRepository.getTicker("SOLUSD")
+                                    val solPair = com.cryptotrader.utils.KrakenAssetMapper.getKrakenPair("SOL", "USD")
+                                    val solTickerResult = krakenRepository.getTicker(solPair)
                                     if (solTickerResult.isSuccess) {
                                         balance * (solTickerResult.getOrNull()?.last ?: 0.0)
                                     } else {
-                                        balance * 100.0 // Fallback estimate
+                                        Timber.w("Failed to fetch SOL price for portfolio calculation")
+                                        0.0 // Cannot calculate value without price
                                     }
                                 }
-                                else -> balance * 1.0 // Fallback: assume 1:1 with USD for unknowns
+                                else -> {
+                                    // Try to get price for unknown asset
+                                    try {
+                                        val unknownPair = com.cryptotrader.utils.KrakenAssetMapper.getKrakenPair(normalizedAsset, "USD")
+                                        val tickerResult = krakenRepository.getTicker(unknownPair)
+                                        if (tickerResult.isSuccess) {
+                                            balance * (tickerResult.getOrNull()?.last ?: 0.0)
+                                        } else {
+                                            Timber.w("Cannot get price for unknown asset: $normalizedAsset")
+                                            0.0
+                                        }
+                                    } catch (e: IllegalArgumentException) {
+                                        Timber.w("Unknown asset without USD pair mapping: $normalizedAsset")
+                                        0.0
+                                    }
+                                }
                             }
 
                             assetBalances[normalizedAsset] = com.cryptotrader.domain.model.AssetBalance(
                                 asset = normalizedAsset,
                                 balance = balance,
                                 valueInUSD = valueInUSD,
-                                percentOfPortfolio = 0.0 // Will calculate after total
+                                percentOfPortfolio = 0.0, // Will calculate after total
+                                valueInEUR = valueInUSD / eurUsdRate // Convert USD to EUR
                             )
 
                             totalValueUSD += valueInUSD
@@ -179,7 +212,7 @@ class DashboardViewModel @Inject constructor(
                         }
                     }
 
-                    // Update percentages
+                    // Update percentages (no need to recalculate EUR values, already set)
                     val assetBalancesWithPercent = assetBalances.mapValues { (_, assetBalance) ->
                         assetBalance.copy(
                             percentOfPortfolio = if (totalValueUSD > 0) {
@@ -200,7 +233,19 @@ class DashboardViewModel @Inject constructor(
                         totalProfitPercent = totalPnLPercent,
                         dayProfit = dayPnL,
                         dayProfitPercent = dayPnLPercent,
-                        openPositions = assetBalances.size - 1 // Exclude USD
+                        openPositions = assetBalances.size - 1, // Exclude USD
+                        // EUR values
+                        totalValueEUR = totalValueUSD / eurUsdRate,
+                        availableBalanceEUR = availableFunds / eurUsdRate,
+                        totalProfitEUR = totalPnL / eurUsdRate,
+                        dayProfitEUR = dayPnL / eurUsdRate,
+                        eurUsdRate = eurUsdRate,
+                        // NOK values
+                        totalValueNOK = totalValueUSD * usdNokRate,
+                        availableBalanceNOK = availableFunds * usdNokRate,
+                        totalProfitNOK = totalPnL * usdNokRate,
+                        dayProfitNOK = dayPnL * usdNokRate,
+                        usdNokRate = usdNokRate
                     )
 
                     // Get price history status
@@ -242,6 +287,22 @@ class DashboardViewModel @Inject constructor(
 
     fun refresh() {
         loadDashboardData()
+    }
+
+    /**
+     * Get selected currency preference
+     */
+    fun getSelectedCurrency(): com.cryptotrader.data.preferences.Currency {
+        return currencyPreferences.getSelectedCurrency()
+    }
+
+    /**
+     * Set currency preference
+     */
+    fun setSelectedCurrency(currency: com.cryptotrader.data.preferences.Currency) {
+        currencyPreferences.setSelectedCurrency(currency)
+        // Refresh to recalculate display (though values are pre-calculated, UI needs to update)
+        _uiState.value = _uiState.value.copy()
     }
 
     /**

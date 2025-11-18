@@ -18,6 +18,9 @@ interface PositionDao {
     @Query("SELECT * FROM positions WHERE status = 'OPEN'")
     fun getOpenPositions(): Flow<List<PositionEntity>>
 
+    @Query("SELECT * FROM positions WHERE status = 'OPEN'")
+    suspend fun getOpenPositionsSnapshot(): List<PositionEntity>
+
     @Query("SELECT * FROM positions WHERE strategyId = :strategyId")
     fun getPositionsByStrategy(strategyId: String): Flow<List<PositionEntity>>
 

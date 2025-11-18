@@ -131,7 +131,7 @@ class AIAdvisorRepositoryImpl @Inject constructor(
 
     override suspend fun insertOpportunity(opportunity: TradingOpportunityEntity): Long = withContext(ioDispatcher) {
         try {
-            Timber.d("Inserting trading opportunity: asset=${opportunity.asset}, type=${opportunity.type}, priority=${opportunity.priority}")
+            Timber.d("Inserting trading opportunity: asset=${opportunity.asset}, direction=${opportunity.direction}, priority=${opportunity.priority}")
             val id = opportunityDao.insertOpportunity(opportunity)
             Timber.d("Successfully inserted opportunity with ID: $id")
             id

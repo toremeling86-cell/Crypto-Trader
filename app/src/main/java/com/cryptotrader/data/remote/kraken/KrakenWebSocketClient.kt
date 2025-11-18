@@ -44,11 +44,16 @@ class KrakenWebSocketClient @Inject constructor(
         .add(KotlinJsonAdapterFactory())
         .build()
 
+    private val parser = KrakenWebSocketParser(moshi)
     private val webSocket = AtomicReference<WebSocket?>(null)
     private val connectionState = AtomicReference(ConnectionState.DISCONNECTED)
     private var reconnectAttempts = 0
     private val maxReconnectAttempts = 5
     private val baseReconnectDelayMs = 1000L
+
+    // Lifecycle management
+    private var isActivelyUsed = false
+    private var lastActivityTimestamp = System.currentTimeMillis()
 
     /**
      * Get current connection state
@@ -59,6 +64,7 @@ class KrakenWebSocketClient @Inject constructor(
      * Subscribe to ticker updates for specific pairs with auto-reconnect
      */
     fun subscribeToTicker(pairs: List<String>): Flow<TickerUpdate> = callbackFlow {
+        markAsActivelyUsed()
         connectionState.set(ConnectionState.CONNECTING)
         reconnectAttempts = 0
 
@@ -93,9 +99,29 @@ class KrakenWebSocketClient @Inject constructor(
 
                 override fun onMessage(ws: WebSocket, text: String) {
                     try {
-                        // Parse ticker update
-                        val tickerUpdate = parseTickerUpdate(text)
-                        tickerUpdate?.let { trySend(it) }
+                        lastActivityTimestamp = System.currentTimeMillis()
+
+                        when (val message = parser.parseMessage(text)) {
+                            is ParsedMessage.Ticker -> {
+                                trySend(message.update)
+                            }
+                            is ParsedMessage.SystemStatus -> {
+                                Timber.d("System status: ${message.message.status}")
+                            }
+                            is ParsedMessage.SubscriptionStatus -> {
+                                if (message.message.status == "subscribed") {
+                                    Timber.i("Subscribed to ${message.message.channelName} for ${message.message.pair}")
+                                } else if (message.message.errorMessage != null) {
+                                    Timber.e("Subscription error: ${message.message.errorMessage}")
+                                }
+                            }
+                            null -> {
+                                // Heartbeat or unknown message - ignore
+                            }
+                            else -> {
+                                // Other message types
+                            }
+                        }
                     } catch (e: Exception) {
                         Timber.e(e, "Error parsing ticker update: $text")
                     }
@@ -145,6 +171,7 @@ class KrakenWebSocketClient @Inject constructor(
 
         awaitClose {
             Timber.d("Closing WebSocket ticker subscription")
+            markAsInactive()
             webSocket.get()?.close(1000, "Client closing")
             webSocket.set(null)
             connectionState.set(ConnectionState.DISCONNECTED)
@@ -177,8 +204,29 @@ class KrakenWebSocketClient @Inject constructor(
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 try {
-                    val ohlcUpdate = parseOHLCUpdate(text)
-                    ohlcUpdate?.let { trySend(it) }
+                    lastActivityTimestamp = System.currentTimeMillis()
+
+                    when (val message = parser.parseMessage(text)) {
+                        is ParsedMessage.OHLC -> {
+                            trySend(message.update)
+                        }
+                        is ParsedMessage.SystemStatus -> {
+                            Timber.d("System status: ${message.message.status}")
+                        }
+                        is ParsedMessage.SubscriptionStatus -> {
+                            if (message.message.status == "subscribed") {
+                                Timber.i("Subscribed to ${message.message.channelName} for ${message.message.pair}")
+                            } else if (message.message.errorMessage != null) {
+                                Timber.e("Subscription error: ${message.message.errorMessage}")
+                            }
+                        }
+                        null -> {
+                            // Heartbeat or unknown message - ignore
+                        }
+                        else -> {
+                            // Other message types
+                        }
+                    }
                 } catch (e: Exception) {
                     Timber.e(e, "Error parsing OHLC update: $text")
                 }
@@ -225,84 +273,31 @@ class KrakenWebSocketClient @Inject constructor(
      */
     fun isConnected(): Boolean = connectionState.get() == ConnectionState.CONNECTED
 
-    private fun parseTickerUpdate(json: String): TickerUpdate? {
-        // Parse JSON array format from Kraken
-        // Example: [0, {"a":["43210.00000",1,"1.000"],...}, "ticker", "XBT/USD"]
-        return try {
-            if (!json.startsWith("[")) return null
-
-            val parts = json.trim('[', ']').split(",", limit = 4)
-            if (parts.size < 4) return null
-
-            val pair = parts[3].trim('"')
-            // Extract price from data object (simplified parsing)
-            val askMatch = Regex(""""a":\["([0-9.]+)"""").find(json)
-            val bidMatch = Regex(""""b":\["([0-9.]+)"""").find(json)
-            val lastMatch = Regex(""""c":\["([0-9.]+)"""").find(json)
-
-            if (askMatch != null && bidMatch != null && lastMatch != null) {
-                TickerUpdate(
-                    pair = pair,
-                    ask = askMatch.groupValues[1].toDouble(),
-                    bid = bidMatch.groupValues[1].toDouble(),
-                    last = lastMatch.groupValues[1].toDouble(),
-                    timestamp = System.currentTimeMillis()
-                )
-            } else null
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to parse ticker update")
-            null
-        }
+    /**
+     * Mark WebSocket as actively used (prevents auto-disconnect)
+     */
+    fun markAsActivelyUsed() {
+        isActivelyUsed = true
+        lastActivityTimestamp = System.currentTimeMillis()
     }
 
-    private fun parseOHLCUpdate(json: String): OHLCUpdate? {
-        // Parse OHLC data from WebSocket message
-        return try {
-            if (!json.startsWith("[")) return null
+    /**
+     * Mark WebSocket as no longer actively used (allows auto-disconnect after timeout)
+     */
+    fun markAsInactive() {
+        isActivelyUsed = false
+    }
 
-            // Simplified parsing - would need more robust implementation
-            val pair = Regex(""""([A-Z/]+)"""").find(json)?.groupValues?.get(1) ?: return null
-
-            OHLCUpdate(
-                pair = pair,
-                time = System.currentTimeMillis(),
-                open = 0.0,
-                high = 0.0,
-                low = 0.0,
-                close = 0.0,
-                volume = 0.0
-            )
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to parse OHLC update")
-            null
-        }
+    /**
+     * Check if WebSocket should auto-disconnect (no activity for 5 minutes)
+     */
+    private fun shouldAutoDisconnect(): Boolean {
+        if (isActivelyUsed) return false
+        val inactiveMs = System.currentTimeMillis() - lastActivityTimestamp
+        return inactiveMs > 5 * 60 * 1000 // 5 minutes
     }
 
     private fun List<String>.toJsonArray(): String {
         return this.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
     }
 }
-
-/**
- * Ticker update data class
- */
-data class TickerUpdate(
-    val pair: String,
-    val ask: Double,
-    val bid: Double,
-    val last: Double,
-    val timestamp: Long
-)
-
-/**
- * OHLC (candlestick) update data class
- */
-data class OHLCUpdate(
-    val pair: String,
-    val time: Long,
-    val open: Double,
-    val high: Double,
-    val low: Double,
-    val close: Double,
-    val volume: Double
-)

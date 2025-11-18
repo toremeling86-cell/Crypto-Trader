@@ -6,6 +6,7 @@ import com.cryptotrader.data.remote.kraken.KrakenApiService
 import com.cryptotrader.data.remote.kraken.KrakenWebSocketClient
 import com.cryptotrader.data.remote.kraken.RateLimiter
 import com.cryptotrader.data.remote.kraken.TickerUpdate
+import com.cryptotrader.data.remote.kraken.dto.TickerData
 import com.cryptotrader.domain.model.*
 import com.cryptotrader.domain.usecase.TradeRequest
 import com.cryptotrader.utils.CryptoUtils
@@ -150,14 +151,25 @@ class KrakenRepository @Inject constructor(
                     val orderId = body.result.transactionIds.firstOrNull()
                         ?: return Result.failure(Exception("No order ID returned"))
 
+                    // Calculate fee based on Kraken's standard fee structure
+                    // Default tier: 0.26% taker fee for market orders, 0.16% maker fee for limit orders
+                    // TODO: Fetch actual fee from QueryOrders endpoint after order executes
+                    val cost = request.price * request.volume
+                    val feePercent = if (request.orderType == com.cryptotrader.domain.usecase.OrderType.MARKET) {
+                        0.0026 // 0.26% taker fee
+                    } else {
+                        0.0016 // 0.16% maker fee
+                    }
+                    val calculatedFee = cost * feePercent
+
                     val trade = Trade(
                         orderId = orderId,
                         pair = request.pair,
                         type = request.type,
                         price = request.price,
                         volume = request.volume,
-                        cost = request.price * request.volume,
-                        fee = 0.0, // Will be updated later
+                        cost = cost,
+                        fee = calculatedFee,
                         timestamp = System.currentTimeMillis(),
                         strategyId = request.strategyId,
                         status = TradeStatus.EXECUTED

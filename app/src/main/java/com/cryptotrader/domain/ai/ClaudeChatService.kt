@@ -140,12 +140,56 @@ class ClaudeChatService @Inject constructor(
             3. Provide a DETAILED analysis report (minimum 200 words)
             4. Return the strategy in the exact JSON format specified
 
+            CRITICAL BACKTEST COMPATIBILITY:
+            ⚠️ Strategies will be backtested on the LAST 100 HOURS of historical data.
+            ⚠️ Entry conditions MUST have triggered at least once in recent 100-hour periods.
+            ⚠️ DO NOT use conditions based on CURRENT market state that may not have occurred 100 hours ago.
+
+            Example of BAD condition generation:
+            - Current market: BTC $102k, MACD = +150 (positive)
+            - You generate: "MACD > 0" (thinking it will trigger because it's positive NOW)
+            - Reality: 100 hours ago MACD was -471, stayed negative entire period → 0 trades ❌
+
+            Example of GOOD condition generation:
+            - Use oscillating indicators that cycle through ranges: RSI, Bollinger Bands
+            - Use crossovers that happen frequently: "SMA_20 > SMA_50"
+            - Check the historical context provided below to see indicator ranges
+            - Ensure conditions will trigger in typical 100-hour volatility
+
+            TRADING COSTS (REALISTIC KRAKEN MODEL):
+            The backtest uses REALISTIC trading costs that match real Kraken exchange fees:
+
+            Base Costs (for ALL orders):
+            - Taker Fee: 0.26% (market orders that remove liquidity)
+            - Maker Fee: 0.16% (limit orders that add liquidity)
+            - Bid-Ask Spread: 0.01% (half of 0.02% typical BTC spread)
+
+            Slippage (depends on position size):
+            - Small positions (<10% of balance): 0.05% slippage
+            - Large positions (>10% of balance): 0.15% slippage (3x multiplier)
+            - Very large positions: Up to 0.25% slippage
+
+            TOTAL ROUND-TRIP COST EXAMPLES:
+            - Small position (5% of balance): ~0.32% entry + 0.32% exit = 0.64% round-trip
+            - Large position (20% of balance): ~0.42% entry + 0.42% exit = 0.84% round-trip
+
+            WHY LARGE POSITIONS COST MORE:
+            When you try to buy/sell $2000 worth of BTC in one order (20% of $10k balance),
+            you move the market price and get worse fills. This is called "slippage" and is
+            a REAL cost that professional traders account for.
+
+            STRATEGY IMPLICATIONS:
+            - Prefer smaller position sizes (5-10%) to minimize slippage
+            - Account for ~0.6-0.8% round-trip costs when setting take-profit levels
+            - A 1% market move only nets ~0.2-0.4% profit after costs
+            - Stop-loss at -3% means you actually lose -3.4% after costs
+
             JSON format for strategies (ALL FIELDS REQUIRED):
             {
               "name": "Strategy Name (descriptive, e.g. 'BTC Mean Reversion Q4 2024')",
               "description": "Brief description of strategy logic and trading style",
-              "entryConditions": ["SPECIFIC entry rules like 'RSI < 30'", "Price crosses above 50 MA", "Volume spike > 2x average"],
-              "exitConditions": ["SPECIFIC exit rules like 'RSI > 70'", "Take profit at +6%", "Stop loss at -3%"],
+              "entryConditions": ["RSI < 30", "MACD > 0", "Volume > average"],
+              "exitConditions": ["RSI > 70", "StopLoss", "TakeProfit"],
               "stopLossPercent": 3.0,
               "takeProfitPercent": 6.0,
               "positionSizePercent": 5.0,
@@ -153,6 +197,18 @@ class ClaudeChatService @Inject constructor(
               "riskLevel": "LOW|MEDIUM|HIGH",
               "analysisReport": "COMPREHENSIVE analysis (minimum 200 words): Current market trends for this specific asset, technical indicators supporting the strategy, fundamental factors, why THIS strategy works NOW, risk factors, expected win rate, optimal market conditions, what could go wrong, and recommended monitoring approach. Be THOROUGH and SPECIFIC!"
             }
+
+            CRITICAL: Entry and exit conditions MUST use ONLY these technical indicators:
+            - RSI (e.g., "RSI < 30", "RSI > 70") ✅ BEST for backtesting - oscillates 0-100
+            - MACD (e.g., "MACD > 0", "MACD_crossover") ⚠️ Can stay one-sided for long periods
+            - Moving Averages (e.g., "SMA_20 > SMA_50", "Price > EMA_50") ✅ GOOD - frequent crosses
+            - Bollinger Bands (e.g., "Price < Bollinger_lower") ✅ BEST - guaranteed touches
+            - Volume (e.g., "Volume > average", "Volume_increasing") ✅ GOOD - always varies
+            - Momentum (e.g., "Momentum > 2.0")
+            - Special (e.g., "StopLoss", "TakeProfit", "Price_near_high")
+
+            DO NOT use natural language conditions like "price is higher than 1 hour ago" or "take profit at +1.5%".
+            ALWAYS use technical indicator syntax like "RSI < 30" or "StopLoss".
 
             Communication style:
             - Be direct and analytical, not vague

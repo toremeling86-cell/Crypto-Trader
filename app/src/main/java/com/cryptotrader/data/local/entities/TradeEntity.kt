@@ -33,12 +33,12 @@ data class TradeEntity(
     val notes: String? = null,
 
     // New execution tracking fields (version 7+)
-    val orderType: String = "MARKET", // MARKET, LIMIT, STOP_LOSS, TAKE_PROFIT
-    val feeCurrency: String = "USD", // Currency of the fee
+    val orderType: String? = null, // MARKET, LIMIT, STOP_LOSS, TAKE_PROFIT
+    val feeCurrency: String? = null, // Currency of the fee
     val krakenOrderId: String? = null, // Kraken order reference
     val krakenTradeId: String? = null, // Kraken trade reference
     val realizedPnL: Double? = null, // Realized profit/loss
     val realizedPnLPercent: Double? = null, // Realized P&L percentage
-    val executedAt: Long = timestamp, // Execution timestamp (separate from creation)
+    val executedAt: Long? = null, // Execution timestamp (separate from creation)
     val positionId: String? = null // Link to position if part of position management
 )

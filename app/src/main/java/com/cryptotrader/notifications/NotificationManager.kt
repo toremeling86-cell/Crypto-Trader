@@ -14,6 +14,8 @@ import androidx.core.content.ContextCompat
 import com.cryptotrader.presentation.MainActivity
 import com.cryptotrader.R
 import com.cryptotrader.domain.model.Trade
+import com.cryptotrader.domain.model.TradeType
+import com.cryptotrader.domain.model.TradingOpportunity
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,10 +32,12 @@ class NotificationManager @Inject constructor(
         private const val CHANNEL_TRADES = "trades"
         private const val CHANNEL_ALERTS = "alerts"
         private const val CHANNEL_PERFORMANCE = "performance"
+        private const val CHANNEL_OPPORTUNITIES = "opportunities"
 
         private const val NOTIFICATION_ID_TRADE = 1000
         private const val NOTIFICATION_ID_ALERT = 2000
         private const val NOTIFICATION_ID_PERFORMANCE = 3000
+        private const val NOTIFICATION_ID_OPPORTUNITY = 4000
     }
 
     init {
@@ -71,10 +75,21 @@ class NotificationManager @Inject constructor(
                 description = "Strategy performance and P&L updates"
             }
 
+            val opportunityChannel = NotificationChannel(
+                CHANNEL_OPPORTUNITIES,
+                "Trading Opportunities",
+                AndroidNotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "AI-identified trading opportunities"
+                enableVibration(true)
+                enableLights(true)
+            }
+
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as AndroidNotificationManager
             notificationManager.createNotificationChannel(tradeChannel)
             notificationManager.createNotificationChannel(alertChannel)
             notificationManager.createNotificationChannel(performanceChannel)
+            notificationManager.createNotificationChannel(opportunityChannel)
         }
     }
 
@@ -116,10 +131,9 @@ class NotificationManager @Inject constructor(
             val message = "Executed at ${String.format("$%.2f", trade.price)} • Vol: ${String.format("%.4f", trade.volume)}"
 
             // Choose icon based on trade type
-            val iconRes = when (trade.type.uppercase()) {
-                "BUY" -> R.drawable.ic_notification_trade_buy
-                "SELL" -> R.drawable.ic_notification_trade_sell
-                else -> R.drawable.ic_notification_trade_buy
+            val iconRes = when (trade.type) {
+                TradeType.BUY -> R.drawable.ic_notification_trade_buy
+                TradeType.SELL -> R.drawable.ic_notification_trade_sell
             }
 
             val notification = NotificationCompat.Builder(context, CHANNEL_TRADES)
@@ -367,6 +381,129 @@ class NotificationManager @Inject constructor(
             Timber.w("Sent large loss alert notification")
         } catch (e: Exception) {
             Timber.e(e, "Error sending large loss notification")
+        }
+    }
+
+    /**
+     * Send notification for AI-identified trading opportunity
+     *
+     * Shows detailed opportunity information including:
+     * - Asset and direction (BUY/SELL)
+     * - Entry price and target price
+     * - Confidence level
+     * - Risk/reward ratio
+     * - Key reasoning points
+     *
+     * Priority is adjusted based on confidence level:
+     * - HIGH priority for confidence >= 75%
+     * - DEFAULT priority for confidence < 75%
+     */
+    fun notifyTradingOpportunity(opportunity: TradingOpportunity) {
+        if (!hasNotificationPermission()) {
+            Timber.w("Notification permission not granted")
+            return
+        }
+
+        try {
+            // Create intent to open app
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Create VIEW action button
+            val viewIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("screen", "opportunity_details")
+                putExtra("opportunity_id", opportunity.id)
+            }
+            val viewPendingIntent = PendingIntent.getActivity(
+                context,
+                opportunity.id.toInt() + 10000,
+                viewIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Format notification content
+            val confidencePercent = (opportunity.confidence * 100).toInt()
+            val title = "${opportunity.direction} ${opportunity.asset} - $confidencePercent% Confidence"
+
+            val shortMessage = buildString {
+                append("Entry: ${formatPrice(opportunity.entryPrice)}")
+                append(" | Target: ${formatPrice(opportunity.targetPrice)}")
+                append(" | R/R: ${String.format("%.1f", opportunity.riskRewardRatio)}:1")
+            }
+
+            val expandedMessage = buildString {
+                append("Entry Price: ${formatPrice(opportunity.entryPrice)}\n")
+                append("Target Price: ${formatPrice(opportunity.targetPrice)}\n")
+                append("Stop Loss: ${formatPrice(opportunity.stopPrice)}\n")
+                append("Potential Gain: ${String.format("%.1f%%", opportunity.targetProfitPercent)}\n")
+                append("Risk/Reward: ${String.format("%.1f", opportunity.riskRewardRatio)}:1\n")
+                append("Confidence: $confidencePercent%\n")
+                append("Time Horizon: ${opportunity.timeHorizon}\n\n")
+
+                if (opportunity.reasoning.isNotEmpty()) {
+                    append("Key Insights:\n")
+                    opportunity.reasoning.take(3).forEach { reason ->
+                        append("• $reason\n")
+                    }
+                }
+            }
+
+            // Determine priority based on confidence
+            val priority = if (opportunity.confidence >= 0.75) {
+                NotificationCompat.PRIORITY_HIGH
+            } else {
+                NotificationCompat.PRIORITY_DEFAULT
+            }
+
+            // Build notification
+            val notification = NotificationCompat.Builder(context, CHANNEL_OPPORTUNITIES)
+                .setSmallIcon(R.drawable.ic_notification_opportunity)
+                .setContentTitle(title)
+                .setContentText(shortMessage)
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText(expandedMessage)
+                        .setBigContentTitle(title)
+                )
+                .setPriority(priority)
+                .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .addAction(
+                    R.drawable.ic_notification_opportunity,
+                    "View Details",
+                    viewPendingIntent
+                )
+                .build()
+
+            // Use unique notification ID based on opportunity ID
+            NotificationManagerCompat.from(context).notify(
+                NOTIFICATION_ID_OPPORTUNITY + opportunity.id.toInt(),
+                notification
+            )
+
+            Timber.d("Sent trading opportunity notification: ${opportunity.asset} ${opportunity.direction} - $confidencePercent% confidence")
+        } catch (e: Exception) {
+            Timber.e(e, "Error sending trading opportunity notification")
+        }
+    }
+
+    /**
+     * Format price based on magnitude for better readability
+     */
+    private fun formatPrice(price: Double): String {
+        return when {
+            price >= 1000 -> String.format("$%.2f", price)
+            price >= 1 -> String.format("$%.4f", price)
+            else -> String.format("$%.6f", price)
         }
     }
 }

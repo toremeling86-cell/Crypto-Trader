@@ -4,9 +4,10 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import com.cryptotrader.workers.TradingWorker
+// TODO: Re-enable TradingWorker after updating to new Position model
+// import androidx.work.PeriodicWorkRequestBuilder
+// import androidx.work.WorkManager
+// import com.cryptotrader.workers.TradingWorker
 import com.cryptotrader.workers.WorkScheduler
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
@@ -92,8 +93,12 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
 
     /**
      * Start trading worker if API credentials are configured
+     * TODO: Re-enable after TradingWorker is updated to new Position model
      */
     private fun startTradingWorkerIfConfigured() {
+        // Temporarily disabled - TradingWorker needs update for new Position model
+        Timber.d("⏸️ Trading worker disabled - pending Position model update")
+        /*
         try {
             // Check if API keys are set
             val hasApiKeys = com.cryptotrader.utils.CryptoUtils.hasApiCredentials(this)
@@ -107,13 +112,18 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
         } catch (e: Exception) {
             Timber.e(e, "Error checking API configuration")
         }
+        */
     }
 
     /**
      * Schedule periodic trading worker
      * Called when API keys are configured or when user starts trading
+     * TODO: Re-enable after TradingWorker is updated to new Position model
      */
     fun scheduleTradingWorker() {
+        // Temporarily disabled - TradingWorker needs update for new Position model
+        Timber.d("⏸️ Trading worker scheduling disabled - pending Position model update")
+        /*
         try {
             val tradingWorkRequest = PeriodicWorkRequestBuilder<TradingWorker>(
                 repeatInterval = 1, // Run every 1 minute
@@ -130,18 +140,24 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
         } catch (e: Exception) {
             Timber.e(e, "Failed to schedule trading worker")
         }
+        */
     }
 
     /**
      * Stop trading worker
+     * TODO: Re-enable after TradingWorker is updated to new Position model
      */
     fun stopTradingWorker() {
+        // Temporarily disabled - TradingWorker needs update for new Position model
+        Timber.d("⏸️ Trading worker stop disabled - pending Position model update")
+        /*
         try {
             WorkManager.getInstance(this).cancelUniqueWork("trading_worker")
             Timber.i("⏹️ Trading worker stopped")
         } catch (e: Exception) {
             Timber.e(e, "Failed to stop trading worker")
         }
+        */
     }
 
     /**

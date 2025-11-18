@@ -1,34 +1,56 @@
 package com.cryptotrader.domain.model
 
 /**
- * Represents an open trading position with stop-loss and take-profit targets
+ * Domain model representing a trading position
+ *
+ * A position tracks the lifecycle of a trade from entry to exit,
+ * including real-time P&L calculations and risk management.
  */
 data class Position(
-    val id: String, // Same as trade orderId
+    val id: String,
     val strategyId: String,
     val pair: String,
-    val type: TradeType,
+    val side: PositionSide,
+    val quantity: Double,
+
+    // Entry details
     val entryPrice: Double,
-    val volume: Double,
-    val stopLossPrice: Double,
+    val entryTradeId: String,
+    val openedAt: Long,
+
+    // Risk management
+    val stopLossPrice: Double?,
     val takeProfitPrice: Double?,
-    val entryTimestamp: Long,
-    val currentPrice: Double = entryPrice,
+    val stopLossOrderId: String?,
+    val takeProfitOrderId: String?,
+
+    // Exit details
+    val exitPrice: Double? = null,
+    val exitTradeId: String? = null,
+    val closedAt: Long? = null,
+    val closeReason: String? = null,
+
+    // P&L tracking
     val unrealizedPnL: Double = 0.0,
     val unrealizedPnLPercent: Double = 0.0,
-    // Trailing stop-loss tracking
-    val useTrailingStop: Boolean = false,
-    val trailingStopPercent: Double = 5.0,
-    val highestPrice: Double = entryPrice, // Track highest price for trailing stop
-    val initialStopLoss: Double = stopLossPrice // Keep initial stop-loss as fallback
+    val realizedPnL: Double? = null,
+    val realizedPnLPercent: Double? = null,
+
+    // Status
+    val status: PositionStatus = PositionStatus.OPEN,
+
+    // Tracking
+    val lastUpdated: Long = System.currentTimeMillis()
 ) {
     /**
      * Check if stop-loss is triggered
      */
     fun isStopLossTriggered(currentPrice: Double): Boolean {
-        return when (type) {
-            TradeType.BUY -> currentPrice <= stopLossPrice  // Price dropped below stop-loss
-            TradeType.SELL -> currentPrice >= stopLossPrice // Price rose above stop-loss
+        if (stopLossPrice == null) return false
+
+        return when (side) {
+            PositionSide.LONG -> currentPrice <= stopLossPrice
+            PositionSide.SHORT -> currentPrice >= stopLossPrice
         }
     }
 
@@ -37,68 +59,76 @@ data class Position(
      */
     fun isTakeProfitTriggered(currentPrice: Double): Boolean {
         if (takeProfitPrice == null) return false
-        return when (type) {
-            TradeType.BUY -> currentPrice >= takeProfitPrice  // Price rose to target
-            TradeType.SELL -> currentPrice <= takeProfitPrice // Price dropped to target
+
+        return when (side) {
+            PositionSide.LONG -> currentPrice >= takeProfitPrice
+            PositionSide.SHORT -> currentPrice <= takeProfitPrice
         }
     }
 
     /**
-     * Calculate current unrealized P&L
+     * Calculate unrealized P&L for current price
      */
-    fun calculateUnrealizedPnL(currentPrice: Double): Position {
-        val pnl = when (type) {
-            TradeType.BUY -> (currentPrice - entryPrice) * volume
-            TradeType.SELL -> (entryPrice - currentPrice) * volume
+    fun calculateUnrealizedPnL(currentPrice: Double): Pair<Double, Double> {
+        val pnl = when (side) {
+            PositionSide.LONG -> (currentPrice - entryPrice) * quantity
+            PositionSide.SHORT -> (entryPrice - currentPrice) * quantity
         }
-        val pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100.0
-
-        return copy(
-            currentPrice = currentPrice,
-            unrealizedPnL = pnl,
-            unrealizedPnLPercent = pnlPercent
-        )
+        val pnlPercent = (pnl / (entryPrice * quantity)) * 100.0
+        return Pair(pnl, pnlPercent)
     }
 
     /**
-     * Update trailing stop-loss based on current price
-     * Returns updated Position with new stop-loss if trailing stop is triggered
+     * Calculate realized P&L at exit price
      */
-    fun updateTrailingStop(currentPrice: Double): Position {
-        if (!useTrailingStop) return this
+    fun calculateRealizedPnL(exitPrice: Double): Pair<Double, Double> {
+        val pnl = when (side) {
+            PositionSide.LONG -> (exitPrice - entryPrice) * quantity
+            PositionSide.SHORT -> (entryPrice - exitPrice) * quantity
+        }
+        val pnlPercent = (pnl / (entryPrice * quantity)) * 100.0
+        return Pair(pnl, pnlPercent)
+    }
+}
 
-        when (type) {
-            TradeType.BUY -> {
-                // For long positions, trail stop-loss upward
-                if (currentPrice > highestPrice) {
-                    // New high price - update trailing stop
-                    val newStopLoss = currentPrice * (1.0 - trailingStopPercent / 100.0)
+/**
+ * Position side enumeration
+ */
+enum class PositionSide {
+    LONG,
+    SHORT;
 
-                    // Only move stop-loss up, never down
-                    if (newStopLoss > stopLossPrice) {
-                        return copy(
-                            highestPrice = currentPrice,
-                            stopLossPrice = newStopLoss
-                        )
-                    }
-                }
-            }
-            TradeType.SELL -> {
-                // For short positions, trail stop-loss downward
-                if (currentPrice < highestPrice) { // Note: for shorts, "highest" means lowest price
-                    val newStopLoss = currentPrice * (1.0 + trailingStopPercent / 100.0)
+    override fun toString(): String = name
 
-                    // Only move stop-loss down, never up
-                    if (newStopLoss < stopLossPrice) {
-                        return copy(
-                            highestPrice = currentPrice,
-                            stopLossPrice = newStopLoss
-                        )
-                    }
-                }
+    companion object {
+        fun fromString(value: String): PositionSide {
+            return when (value.uppercase()) {
+                "LONG" -> LONG
+                "SHORT" -> SHORT
+                else -> throw IllegalArgumentException("Unknown position side: $value")
             }
         }
+    }
+}
 
-        return this
+/**
+ * Position status enumeration
+ */
+enum class PositionStatus {
+    OPEN,
+    CLOSED,
+    LIQUIDATED;
+
+    override fun toString(): String = name
+
+    companion object {
+        fun fromString(value: String): PositionStatus {
+            return when (value.uppercase()) {
+                "OPEN" -> OPEN
+                "CLOSED" -> CLOSED
+                "LIQUIDATED" -> LIQUIDATED
+                else -> OPEN
+            }
+        }
     }
 }

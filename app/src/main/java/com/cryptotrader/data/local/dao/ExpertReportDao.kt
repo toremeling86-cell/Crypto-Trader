@@ -73,4 +73,60 @@ interface ExpertReportDao {
 
     @Query("SELECT DISTINCT category FROM expert_reports ORDER BY category ASC")
     fun getAllCategories(): Flow<List<String>>
+
+    // ========== Meta-Analysis Queries (Phase 3) ==========
+
+    /**
+     * Get all unanalyzed reports (not included in any meta-analysis yet)
+     */
+    @Query("SELECT * FROM expert_reports WHERE analyzed = 0 ORDER BY uploadDate DESC")
+    fun getUnanalyzedReports(): Flow<List<ExpertReportEntity>>
+
+    /**
+     * Get count of unanalyzed reports (for badge display)
+     */
+    @Query("SELECT COUNT(*) FROM expert_reports WHERE analyzed = 0")
+    fun getUnanalyzedReportsCount(): Flow<Int>
+
+    /**
+     * Get all reports included in a specific meta-analysis
+     */
+    @Query("SELECT * FROM expert_reports WHERE metaAnalysisId = :metaAnalysisId ORDER BY uploadDate DESC")
+    fun getReportsByMetaAnalysisId(metaAnalysisId: Long): Flow<List<ExpertReportEntity>>
+
+    /**
+     * Get reports by analysis status
+     */
+    @Query("SELECT * FROM expert_reports WHERE analyzed = :analyzed ORDER BY uploadDate DESC")
+    fun getReportsByAnalysisStatus(analyzed: Boolean): Flow<List<ExpertReportEntity>>
+
+    /**
+     * Mark report as analyzed and link to meta-analysis
+     */
+    @Query("UPDATE expert_reports SET analyzed = 1, metaAnalysisId = :metaAnalysisId WHERE id = :reportId")
+    suspend fun markReportAsAnalyzed(reportId: Long, metaAnalysisId: Long)
+
+    /**
+     * Mark multiple reports as analyzed (batch operation)
+     */
+    @Query("UPDATE expert_reports SET analyzed = 1, metaAnalysisId = :metaAnalysisId WHERE id IN (:reportIds)")
+    suspend fun markReportsAsAnalyzed(reportIds: List<Long>, metaAnalysisId: Long)
+
+    /**
+     * Reset analysis status (for re-analysis)
+     */
+    @Query("UPDATE expert_reports SET analyzed = 0, metaAnalysisId = NULL WHERE id = :reportId")
+    suspend fun resetAnalysisStatus(reportId: Long)
+
+    /**
+     * Get reports by filename (for file-based uploads)
+     */
+    @Query("SELECT * FROM expert_reports WHERE filename = :filename")
+    suspend fun getReportByFilename(filename: String): ExpertReportEntity?
+
+    /**
+     * Get reports by file path
+     */
+    @Query("SELECT * FROM expert_reports WHERE filePath = :filePath")
+    suspend fun getReportByFilePath(filePath: String): ExpertReportEntity?
 }
