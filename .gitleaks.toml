@@ -12,7 +12,15 @@ paths = [
     '''test.*\.kt$''',
     '''Test.*\.kt$''',
     '''.*test_.*\.log$''',
-    '''sample_data/.*'''
+    '''sample_data/.*''',
+    '''RELEASE_NOTES.*\.md$''',           # Release documentation
+    '''PHASE.*PLANNING\.md$''',            # Planning documents
+    '''.*_PLANNING\.md$''',                # All planning documents
+    '''ROADMAP.*\.md$''',                  # Roadmap documents
+    '''MIGRATIONS\.md$''',                 # Migration history
+    '''DB_MIGRATION_POLICY\.md$''',        # Migration policy
+    '''docs/.*\.md$''',                    # All documentation
+    '''test_results/.*'''                  # Test result logs
 ]
 
 # Allowlist specific strings that are known to be safe
@@ -21,6 +29,13 @@ regexes = [
     '''AKIAIOSFODNN7EXAMPLE''',           # AWS example credentials
     '''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''',  # AWS example secret
     '''-----BEGIN FAKE CERTIFICATE-----''',  # Test certificates
+    '''v\d+\.\d+\.\d+''',                  # Version numbers (v0.19.0, etc.)
+    '''MIGRATION_\d+_\d+''',               # Migration constants
+    '''bt_\d{13}''',                       # Backtest run IDs (timestamp-based)
+    '''meta_strat_\d{13}''',               # Strategy IDs (timestamp-based)
+    '''test_\d{13}''',                     # Test IDs (timestamp-based)
+    '''Commit:.*[a-f0-9]{7,40}''',        # Commit hashes in documentation (with "Commit:" prefix)
+    '''commit.*[a-f0-9]{7,40}''',         # Commit hashes with "commit" prefix
 ]
 
 # Allowlist commits (if needed for legacy)
