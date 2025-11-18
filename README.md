@@ -1,6 +1,12 @@
 # CryptoTrader - AI-Powered Cryptocurrency Trading Platform
 
+[![Android CI](https://github.com/toremeling86-cell/Crypto-Trader/actions/workflows/build-test.yml/badge.svg)](https://github.com/toremeling86-cell/Crypto-Trader/actions/workflows/build-test.yml)
+[![DB Version](https://img.shields.io/badge/Database-v16-blue)](./MIGRATIONS.md)
+[![Review Ready](https://img.shields.io/badge/Review-7/9%20(78%25)-green)](./REVIEW_READY_CHECKLIST.md)
+
 **CryptoTrader** er en profesjonell Android-applikasjon for automatisert kryptovalutahandel med Kraken API-integrasjon og AI-drevet strategigenerering.
+
+**Status:** ✅ Review-Ready | 🚀 Active Development | 📊 DB v16
 
 ## 🚀 Funksjoner
 
@@ -47,38 +53,46 @@ Data Sources (Room DB, Kraken API, Claude API)
 - **Security**: Encrypted SharedPreferences
 - **Logging**: Timber
 
-## 📦 Installasjon og Setup
+## 📦 Build & Test
 
-### Forutsetninger
-- Android Studio Arctic Fox eller nyere
-- Android SDK 26+ (Android 8.0)
-- Kraken API-nøkler ([Skaff her](https://www.kraken.com/features/api))
-- Claude API-nøkkel (valgfritt)
+### Quick Start
 
-### Bygge Prosjektet
-
-1. **Klon repositoryet**:
 ```bash
-cd D:\Development\Projects\Mobile\Android\CryptoTrader
+# Clone repository
+git clone https://github.com/toremeling86-cell/Crypto-Trader.git
+cd Crypto-Trader
+
+# Setup environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# Build & test
+./gradlew clean :app:testDebugUnitTest
+./gradlew :app:assembleDebug
+
+# Install on device
+./gradlew :app:installDebug
 ```
 
-2. **Åpne i Android Studio**:
-   - File → Open → Velg `CryptoTrader`-mappen
+**📘 For detailed instructions, see:** [BUILD_RUN.md](./BUILD_RUN.md)
 
-3. **Sync Gradle**:
-   - Klikk "Sync Now" når Android Studio spør
+### Prerequisites
+- Android Studio Hedgehog or newer
+- JDK 17
+- Android SDK 34
+- Gradle 8.2+
+- Kraken API keys ([Get here](https://www.kraken.com/features/api))
+- Claude API key (optional)
 
-4. **Bygg APK**:
-```bash
-./gradlew assembleDebug
-```
+### CI/CD Pipeline
 
-5. **Installer på enhet**:
-```bash
-./gradlew installDebug
-```
+All pushes to `main` automatically trigger:
+- ✅ Code style checks (ktlint, detekt)
+- ✅ Unit tests (`testDebugUnitTest`)
+- ✅ Smoke tests (backtest pipeline validation)
+- ✅ APK build verification
 
-Eller bruk Android Studio's "Run" knapp.
+**View CI Status:** [GitHub Actions](https://github.com/toremeling86-cell/Crypto-Trader/actions)
 
 ### Kraken API Setup
 
@@ -102,13 +116,27 @@ Eller bruk Android Studio's "Run" knapp.
 
 ### Unit Tests
 ```bash
-./gradlew test
+./gradlew :app:testDebugUnitTest
 ```
+
+### Smoke Tests
+```bash
+# Runs BacktestSmokeTest - MUST produce >0 trades
+./gradlew :app:test --tests "*.BacktestSmokeTest"
+```
+
+**Critical:** Smoke tests validate:
+- Backtest pipeline functionality
+- Sharpe ratio calculation accuracy
+- Look-ahead bias prevention
+- Sample data integrity
 
 ### UI Tests
 ```bash
 ./gradlew connectedAndroidTest
 ```
+
+**Test Coverage:** See `app/src/test/` and `app/src/androidTest/`
 
 ## 📊 Database Schema
 
@@ -172,18 +200,51 @@ Dette er et privat prosjekt. Kontakt eieren for bidragsmuligheter.
 
 For spørsmål eller problemer, åpne et issue i GitHub repository.
 
-## 🎯 Fremtidige Forbedringer
+## 📚 Documentation
 
+- **[BUILD_RUN.md](./BUILD_RUN.md)** - Build instructions, smoke tests, artifact locations
+- **[MIGRATIONS.md](./MIGRATIONS.md)** - Database migration history (v1→v16)
+- **[REVIEW_READY_CHECKLIST.md](./REVIEW_READY_CHECKLIST.md)** - Expert review checklist (7/9 complete)
+- **[PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)** - Architecture and system design
+- **[HEDGE_FUND_QUALITY_FIXES.md](./HEDGE_FUND_QUALITY_FIXES.md)** - Production-ready improvements
+
+## 🔄 Recent Improvements (November 2024)
+
+### ✅ P0-1: Strategy Soft-Delete (DB v15→v16)
+- Strategies with hardcoded prices are now **preserved** instead of deleted
+- Enables debugging and strategy history analysis
+- Migration: [DatabaseMigrations.kt#L847-L861](app/src/main/java/com/cryptotrader/data/local/migrations/DatabaseMigrations.kt)
+
+### ✅ P1-3: Sharpe Ratio Annualization Fix
+- **Fixed:** Hardcoded 252 trading days (incorrect for crypto 24/7 markets)
+- **Now:** Timeframe-aware calculation (1m: 525,960, 1h: 8,766, 1d: 365.25 periods/year)
+- Crypto markets trade 24/7, not just stock market hours!
+
+### ✅ Cloud Storage System (Cloudflare R2)
+- Smart quarter-based historical data download
+- Parquet file support with Zstandard compression
+- Data tier quality levels (PREMIUM/PROFESSIONAL/STANDARD/BASIC)
+
+## 🎯 Roadmap
+
+**FASE 1 (In Progress):**
+- [x] P0-1: Soft-delete strategies
+- [x] P1-3: Sharpe ratio crypto annualization
+- [ ] P1-4: Data provenance tracking
+- [ ] P1-5: Parameterized cost model
+
+**FASE 2 (Planned):**
+- [ ] P1-6: Look-ahead bias invariance tests
+- [ ] P1-7: NDJSON observability logging
+
+**FASE 3 (Planned):**
+- [ ] P0-2: Re-activate MetaAnalysisAgent
 - [ ] Multi-exchange support (Binance, Coinbase)
-- [ ] Backtesting engine
-- [ ] Portfolio rebalancing
-- [ ] Push notifications for trade alerts
-- [ ] Advanced charting med technical indicators
-- [ ] Social trading features
-- [ ] Voice commands via Claude
+- [ ] Advanced charting with technical indicators
 
 ---
 
-**Versjon**: 1.0.0
-**Sist oppdatert**: November 2024
-**Status**: ✅ MVP Komplett
+**Branch:** `main`
+**Database Version:** v16
+**Last Updated:** November 18, 2024
+**Status:** 🟢 Review-Ready (7/9 items complete)
