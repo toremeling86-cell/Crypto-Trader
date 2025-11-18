@@ -16,9 +16,16 @@ import com.cryptotrader.data.local.entities.*
         MarketCorrelationEntity::class,
         AdvisorAnalysisEntity::class,
         TradingOpportunityEntity::class,
-        AdvisorNotificationEntity::class
+        AdvisorNotificationEntity::class,
+        MetaAnalysisEntity::class,
+        OHLCBarEntity::class,
+        TechnicalIndicatorEntity::class,
+        DataCoverageEntity::class,
+        BacktestRunEntity::class,
+        DataQualityEntity::class,
+        DataQuarterCoverageEntity::class
     ],
-    version = 7, // Fixed DTO duplicates and schema changes
+    version = 16, // Migration 15→16: Add soft-delete fields to strategies (isInvalid, invalidReason, invalidatedAt)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +42,19 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun advisorAnalysisDao(): AdvisorAnalysisDao
     abstract fun tradingOpportunityDao(): TradingOpportunityDao
     abstract fun advisorNotificationDao(): AdvisorNotificationDao
+
+    // Meta-Analysis DAO
+    abstract fun metaAnalysisDao(): MetaAnalysisDao
+
+    // Backend Data Storage DAOs (version 13+)
+    abstract fun ohlcBarDao(): OHLCBarDao
+    abstract fun technicalIndicatorDao(): TechnicalIndicatorDao
+    abstract fun dataCoverageDao(): DataCoverageDao
+    abstract fun backtestRunDao(): BacktestRunDao
+    abstract fun dataQualityDao(): DataQualityDao
+
+    // Cloud Storage DAO (version 15+)
+    abstract fun dataQuarterCoverageDao(): DataQuarterCoverageDao
 
     companion object {
         const val DATABASE_NAME = "crypto_trader_db"

@@ -101,4 +101,52 @@ object DatabaseModule {
     fun provideAdvisorNotificationDao(database: AppDatabase): com.cryptotrader.data.local.dao.AdvisorNotificationDao {
         return database.advisorNotificationDao()
     }
+
+    // Meta-Analysis DAO
+
+    @Provides
+    @Singleton
+    fun provideMetaAnalysisDao(database: AppDatabase): com.cryptotrader.data.local.dao.MetaAnalysisDao {
+        return database.metaAnalysisDao()
+    }
+
+    // Backend Data Storage DAOs (for backtesting system)
+
+    @Provides
+    @Singleton
+    fun provideOHLCBarDao(database: AppDatabase): com.cryptotrader.data.local.dao.OHLCBarDao {
+        return database.ohlcBarDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTechnicalIndicatorDao(database: AppDatabase): com.cryptotrader.data.local.dao.TechnicalIndicatorDao {
+        return database.technicalIndicatorDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDataCoverageDao(database: AppDatabase): com.cryptotrader.data.local.dao.DataCoverageDao {
+        return database.dataCoverageDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBacktestRunDao(database: AppDatabase): com.cryptotrader.data.local.dao.BacktestRunDao {
+        return database.backtestRunDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDataQualityDao(database: AppDatabase): com.cryptotrader.data.local.dao.DataQualityDao {
+        return database.dataQualityDao()
+    }
+
+    // Cloud Storage DAO (for cloud data management)
+
+    @Provides
+    @Singleton
+    fun provideDataQuarterCoverageDao(database: AppDatabase): com.cryptotrader.data.local.dao.DataQuarterCoverageDao {
+        return database.dataQuarterCoverageDao()
+    }
 }
