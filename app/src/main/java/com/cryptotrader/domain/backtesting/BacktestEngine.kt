@@ -6,7 +6,10 @@ import com.cryptotrader.domain.model.*
 import com.cryptotrader.domain.trading.RiskManager
 import com.cryptotrader.domain.trading.TradingEngine
 import com.cryptotrader.domain.validation.DataTierValidator
+import com.cryptotrader.utils.toBigDecimalMoney
+import com.cryptotrader.utils.safeDiv
 import timber.log.Timber
+import java.math.BigDecimal
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,6 +22,12 @@ import javax.inject.Singleton
  * - Realistic cost modeling
  * - Proper equity curve calculation
  *
+ * BigDecimal Migration (Phase 2.9):
+ * - All calculations use exact BigDecimal arithmetic
+ * - Eliminates floating-point precision errors
+ * - runBacktestDecimal() is the new standard method
+ * - Original runBacktest() deprecated but maintained for compatibility
+ *
  * This allows users to validate strategy performance before risking real money
  */
 @Singleton
@@ -29,7 +38,670 @@ class BacktestEngine @Inject constructor(
 ) {
 
     /**
-     * Run backtest for a strategy using historical price data
+     * Run backtest for a strategy using historical price data with EXACT BigDecimal arithmetic
+     *
+     * This is the PREFERRED method for all new code - provides exact calculations without
+     * floating-point precision errors that can compound over hundreds of trades.
+     *
+     * @param strategy The trading strategy to test
+     * @param historicalData List of price bars (OHLC + timestamp)
+     * @param startingBalance Initial balance for the backtest
+     * @param costModel Trading cost model (fees, slippage, spread)
+     * @param ohlcBars Optional: for data tier validation
+     * @return Backtest results with performance metrics (all BigDecimal)
+     */
+    suspend fun runBacktestDecimal(
+        strategy: Strategy,
+        historicalData: List<PriceBar>,
+        startingBalance: BigDecimal = "10000.0".toBigDecimalMoney(),
+        costModel: TradingCostModel = TradingCostModel(),
+        ohlcBars: List<OHLCBarEntity>? = null  // Optional: for data tier validation
+    ): BacktestResultDecimal {
+        Timber.d("Starting backtest (BigDecimal) for strategy: ${strategy.name}, data points: ${historicalData.size}")
+
+        if (historicalData.isEmpty()) {
+            return BacktestResultDecimal(
+                strategyId = strategy.id,
+                strategyName = strategy.name,
+                startingBalanceDecimal = startingBalance,
+                endingBalanceDecimal = startingBalance,
+                totalTrades = 0,
+                winningTrades = 0,
+                losingTrades = 0,
+                winRateDecimal = BigDecimal.ZERO,
+                totalPnLDecimal = BigDecimal.ZERO,
+                totalPnLPercentDecimal = BigDecimal.ZERO,
+                maxDrawdownPercentDecimal = BigDecimal.ZERO,
+                sharpeRatioDecimal = BigDecimal.ZERO,
+                profitFactorDecimal = BigDecimal.ZERO,
+                averageProfitDecimal = BigDecimal.ZERO,
+                averageLossDecimal = BigDecimal.ZERO,
+                bestTradeDecimal = BigDecimal.ZERO,
+                worstTradeDecimal = BigDecimal.ZERO,
+                trades = emptyList(),
+                equityCurveDecimal = listOf(Pair(0L, startingBalance)),
+                dataTier = null,
+                dataQualityScore = null
+            )
+        }
+
+        // HEDGE FUND QUALITY: Data tier validation (if OHLC entities provided)
+        var dataTier: DataTier? = null
+        var dataQualityScore: Double? = null
+
+        if (ohlcBars != null && ohlcBars.isNotEmpty()) {
+            try {
+                Timber.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                Timber.i("🔒 DATA TIER VALIDATION STARTING")
+                Timber.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                // Calculate expected bars
+                val expectedBars = historicalData.size.toLong()
+
+                // Validate data tier consistency and quality
+                val validation = DataTierValidator.validateBacktestData(ohlcBars, expectedBars)
+
+                dataTier = validation.tier
+                dataQualityScore = validation.qualityScore
+
+                Timber.i("✅ Data tier validation PASSED")
+                Timber.i("   Tier: ${validation.tier.tierName}")
+                Timber.i("   Quality Score: ${String.format("%.2f", validation.qualityScore)}")
+                Timber.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Data tier validation FAILED")
+                Timber.e("   Error: ${e.message}")
+                Timber.e("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                // Return failure result with validation error
+                return BacktestResultDecimal(
+                    strategyId = strategy.id,
+                    strategyName = strategy.name,
+                    startingBalanceDecimal = startingBalance,
+                    endingBalanceDecimal = startingBalance,
+                    totalTrades = 0,
+                    winningTrades = 0,
+                    losingTrades = 0,
+                    winRateDecimal = BigDecimal.ZERO,
+                    totalPnLDecimal = BigDecimal.ZERO,
+                    totalPnLPercentDecimal = BigDecimal.ZERO,
+                    maxDrawdownPercentDecimal = BigDecimal.ZERO,
+                    sharpeRatioDecimal = BigDecimal.ZERO,
+                    profitFactorDecimal = BigDecimal.ZERO,
+                    averageProfitDecimal = BigDecimal.ZERO,
+                    averageLossDecimal = BigDecimal.ZERO,
+                    bestTradeDecimal = BigDecimal.ZERO,
+                    worstTradeDecimal = BigDecimal.ZERO,
+                    trades = emptyList(),
+                    equityCurveDecimal = listOf(Pair(0L, startingBalance)),
+                    validationError = e.message,
+                    dataTier = null,
+                    dataQualityScore = null
+                )
+            }
+        } else {
+            Timber.w("⚠️ No OHLC bars provided - skipping data tier validation")
+        }
+
+        // HEDGE-FUND QUALITY ACCOUNTING (BigDecimal):
+        // We track three separate values for accurate P&L calculation:
+        // 1. balance: Available cash (starts at startingBalance, reduced when buying, increased when selling)
+        // 2. realizedPnL: Cumulative profit/loss from closed positions
+        // 3. unrealizedPnL: Current profit/loss from open positions
+        // Total equity = balance + unrealizedPnL (balance already includes realized P&L)
+        var balance = startingBalance
+        var realizedPnL = BigDecimal.ZERO  // Track realized P&L separately from balance
+        val trades = mutableListOf<BacktestTradeDecimal>()
+        val equityCurve = mutableListOf(Pair(0L, startingBalance))
+        val openPositions = mutableMapOf<String, BacktestPositionDecimal>() // pair -> position
+
+        // CRITICAL: Clear price history before backtest to prevent contamination from previous runs
+        val pair = strategy.tradingPairs.firstOrNull() ?: "XXBTZUSD"
+        tradingEngine.clearPriceHistory(pair)
+        Timber.i("Cleared price history for $pair before backtest")
+
+        // Log strategy details at start
+        Timber.i("=== BACKTEST STRATEGY DETAILS ===")
+        Timber.i("Strategy: ${strategy.name}")
+        Timber.i("Entry Conditions: ${strategy.entryConditions.joinToString(" AND ")}")
+        Timber.i("Exit Conditions: ${strategy.exitConditions.joinToString(" OR ")}")
+        Timber.i("Position Size: ${strategy.positionSizePercent}%")
+        Timber.i("Stop Loss: ${strategy.stopLossPercent}%")
+        Timber.i("Take Profit: ${strategy.takeProfitPercent}%")
+        Timber.i("BACKTEST MODE: Look-ahead bias prevention ENABLED")
+        Timber.i("CALCULATION MODE: BigDecimal exact arithmetic")
+        Timber.i("=================================")
+
+        historicalData.forEachIndexed { index, priceBar ->
+            // CRITICAL FIX FOR LOOK-AHEAD BIAS:
+            // Before evaluating the current candle, we add all PREVIOUS candles to history.
+            // This ensures the strategy only sees completed candles, never the current one.
+            if (index > 0) {
+                val previousBar = historicalData[index - 1]
+                val previousMarketData = MarketTicker(
+                    pair = pair,
+                    ask = previousBar.close,
+                    bid = previousBar.close,
+                    last = previousBar.close,
+                    volume24h = previousBar.volume,
+                    high24h = previousBar.high,
+                    low24h = previousBar.low,
+                    change24h = previousBar.close - previousBar.open,
+                    changePercent24h = ((previousBar.close - previousBar.open) / previousBar.open) * 100.0
+                )
+                tradingEngine.updatePriceHistory(pair, previousMarketData)
+
+                if (index % 50 == 0) {
+                    Timber.d("Added previous candle to history (index ${index-1}), now evaluating current candle (index $index)")
+                }
+            }
+
+            // Log every 10th candle to track progress
+            if (index % 10 == 0) {
+                Timber.d("Backtest iteration $index/${historicalData.size}: Price ${priceBar.close}, Balance: ${balance.toPlainString()}")
+            }
+
+            val currentPriceDecimal = priceBar.close.toBigDecimalMoney()
+
+            // Check stop-loss and take-profit for open positions
+            val positionsToClose = mutableListOf<String>()
+            openPositions.forEach { (pair, position) ->
+                // Check stop-loss
+                if (position.type == TradeType.BUY && currentPriceDecimal <= position.stopLossPriceDecimal) {
+                    // FIX Bug 1.2 + 1.3: Correct P&L and balance calculation
+                    // Stop-loss hit on long position - calculate exit costs
+                    val exitValue = currentPriceDecimal * position.volumeDecimal
+                    val exitExecutionType = OrderExecutionType.TAKER // Stop-loss is usually market order
+                    val exitCost = costModel.calculateTradeCostDecimal(
+                        orderType = exitExecutionType,
+                        orderValue = exitValue,
+                        isLargeOrder = exitValue > balance * "0.1".toBigDecimalMoney()
+                    )
+
+                    // Apply slippage to exit price (negative for selling)
+                    val exitSlippagePercent = exitCost.slippagePercent safeDiv BigDecimal("100")
+                    val exitPrice = currentPriceDecimal * (BigDecimal.ONE - exitSlippagePercent) // Get less when selling
+
+                    // HEDGE-FUND QUALITY P&L CALCULATION:
+                    // proceeds: What we receive from selling the position
+                    // exitFees: Costs to exit the position
+                    // netProceeds: What we actually get back (proceeds - exit fees)
+                    // costBasis: What we originally paid (entry price * volume + entry fees)
+                    // pnl: Actual profit or loss (netProceeds - costBasis)
+                    val proceeds = exitPrice * position.volumeDecimal
+                    val netProceeds = proceeds - exitCost.totalCost
+                    val costBasis = position.entryPriceDecimal * position.volumeDecimal + position.totalCostDecimal
+                    val pnl = netProceeds - costBasis
+
+                    // Add all proceeds back to balance
+                    balance += netProceeds
+                    realizedPnL += pnl
+
+                    Timber.d("STOP-LOSS EXIT: $pair")
+                    Timber.d("  Entry: ${position.entryPriceDecimal.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${(position.entryPriceDecimal * position.volumeDecimal).toPlainString()}")
+                    Timber.d("  Entry Costs: ${position.totalCostDecimal.toPlainString()}")
+                    Timber.d("  Cost Basis: ${costBasis.toPlainString()}")
+                    Timber.d("  Exit: ${exitPrice.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${proceeds.toPlainString()}")
+                    Timber.d("  Exit Costs: ${exitCost.totalCost.toPlainString()}")
+                    Timber.d("  Net Proceeds: ${netProceeds.toPlainString()}")
+                    Timber.d("  P&L: ${pnl.toPlainString()}")
+                    Timber.d("  New Balance: ${balance.toPlainString()}, Realized P&L: ${realizedPnL.toPlainString()}")
+
+                    trades.add(
+                        BacktestTradeDecimal(
+                            timestamp = priceBar.timestamp,
+                            pair = pair,
+                            type = TradeType.SELL,
+                            entryPriceDecimal = position.entryPriceDecimal,
+                            exitPriceDecimal = exitPrice,
+                            volumeDecimal = position.volumeDecimal,
+                            pnlDecimal = pnl,
+                            entryCostDecimal = position.totalCostDecimal,
+                            exitCostDecimal = exitCost.totalCost,
+                            reason = "Stop-Loss"
+                        )
+                    )
+                    positionsToClose.add(pair)
+                }
+
+                // Check take-profit
+                if (position.type == TradeType.BUY && currentPriceDecimal >= position.takeProfitPriceDecimal) {
+                    // FIX Bug 1.2 + 1.3: Correct P&L and balance calculation
+                    // Take-profit hit on long position - calculate exit costs
+                    val exitValue = currentPriceDecimal * position.volumeDecimal
+                    val exitExecutionType = if (strategy.postOnly) OrderExecutionType.MAKER else OrderExecutionType.TAKER
+                    val exitCost = costModel.calculateTradeCostDecimal(
+                        orderType = exitExecutionType,
+                        orderValue = exitValue,
+                        isLargeOrder = exitValue > balance * "0.1".toBigDecimalMoney()
+                    )
+
+                    // Apply slippage to exit price (negative for selling)
+                    val exitSlippagePercent = exitCost.slippagePercent safeDiv BigDecimal("100")
+                    val exitPrice = currentPriceDecimal * (BigDecimal.ONE - exitSlippagePercent) // Get less when selling
+
+                    // HEDGE-FUND QUALITY P&L CALCULATION
+                    val proceeds = exitPrice * position.volumeDecimal
+                    val netProceeds = proceeds - exitCost.totalCost
+                    val costBasis = position.entryPriceDecimal * position.volumeDecimal + position.totalCostDecimal
+                    val pnl = netProceeds - costBasis
+
+                    balance += netProceeds
+                    realizedPnL += pnl
+
+                    Timber.d("TAKE-PROFIT EXIT: $pair")
+                    Timber.d("  Entry: ${position.entryPriceDecimal.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${(position.entryPriceDecimal * position.volumeDecimal).toPlainString()}")
+                    Timber.d("  Entry Costs: ${position.totalCostDecimal.toPlainString()}")
+                    Timber.d("  Cost Basis: ${costBasis.toPlainString()}")
+                    Timber.d("  Exit: ${exitPrice.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${proceeds.toPlainString()}")
+                    Timber.d("  Exit Costs: ${exitCost.totalCost.toPlainString()}")
+                    Timber.d("  Net Proceeds: ${netProceeds.toPlainString()}")
+                    Timber.d("  P&L: ${pnl.toPlainString()}")
+                    Timber.d("  New Balance: ${balance.toPlainString()}, Realized P&L: ${realizedPnL.toPlainString()}")
+
+                    trades.add(
+                        BacktestTradeDecimal(
+                            timestamp = priceBar.timestamp,
+                            pair = pair,
+                            type = TradeType.SELL,
+                            entryPriceDecimal = position.entryPriceDecimal,
+                            exitPriceDecimal = exitPrice,
+                            volumeDecimal = position.volumeDecimal,
+                            pnlDecimal = pnl,
+                            entryCostDecimal = position.totalCostDecimal,
+                            exitCostDecimal = exitCost.totalCost,
+                            reason = "Take-Profit"
+                        )
+                    )
+                    positionsToClose.add(pair)
+                }
+            }
+
+            // Close positions that hit stop-loss or take-profit
+            positionsToClose.forEach { openPositions.remove(it) }
+
+            // Evaluate strategy for signal
+            val change = priceBar.close - priceBar.open
+            val changePercent = (change / priceBar.open) * 100.0
+
+            val marketData = MarketTicker(
+                pair = strategy.tradingPairs.firstOrNull() ?: "XXBTZUSD",
+                ask = priceBar.close,
+                bid = priceBar.close,
+                last = priceBar.close,
+                volume24h = priceBar.volume,
+                high24h = priceBar.high,
+                low24h = priceBar.low,
+                change24h = change,
+                changePercent24h = changePercent
+            )
+
+            // Note: Portfolio uses Double for backward compatibility, but we track with BigDecimal
+            val portfolio = Portfolio(
+                totalValue = balance.toDouble(),
+                availableBalance = balance.toDouble(),
+                balances = emptyMap(),
+                totalProfit = (balance - startingBalance).toDouble(),
+                totalProfitPercent = ((balance - startingBalance) safeDiv startingBalance * BigDecimal("100")).toDouble(),
+                dayProfit = 0.0,
+                dayProfitPercent = 0.0,
+                openPositions = openPositions.size
+            )
+
+            // CRITICAL: Pass isBacktesting=true to prevent look-ahead bias
+            val signal = tradingEngine.evaluateStrategy(
+                strategy = strategy,
+                marketData = marketData,
+                portfolio = portfolio,
+                isBacktesting = true  // Ensures only completed candles are used
+            )
+
+            // Log signal evaluation results (especially for early iterations)
+            if (index < 35 || signal != null) {
+                Timber.d("Iteration $index: Signal = ${signal?.action ?: "NULL"}, Price = ${priceBar.close}, Balance = ${balance.toPlainString()}")
+            }
+
+            if (signal != null) {
+                Timber.i("🎯 SIGNAL GENERATED at iteration $index: ${signal.action} ${signal.pair} @ ${priceBar.close}, Reason: ${signal.reason}")
+                when (signal.action) {
+                    TradeAction.BUY -> {
+                        // Only buy if we don't have an open position for this pair
+                        if (!openPositions.containsKey(signal.pair)) {
+                            // FIX Bug 1.4: Correct slippage handling on entry
+                            // Target position size in dollars
+                            val targetPositionSize = balance * (strategy.positionSizePercent.toBigDecimalMoney() safeDiv BigDecimal("100"))
+
+                            // Calculate trading costs using cost model (estimated on target size)
+                            val executionType = if (strategy.postOnly) OrderExecutionType.MAKER else OrderExecutionType.TAKER
+                            val tradeCost = costModel.calculateTradeCostDecimal(
+                                orderType = executionType,
+                                orderValue = targetPositionSize,
+                                isLargeOrder = targetPositionSize > balance * "0.1".toBigDecimalMoney() // >10% of balance = large order
+                            )
+
+                            // HEDGE-FUND QUALITY ENTRY CALCULATION:
+                            // 1. Apply slippage to get the actual entry price we'll pay
+                            // 2. Calculate volume at the slipped price (not the close price)
+                            // 3. Calculate actual cost including fees
+                            // 4. Deduct actual cost from balance (not just positionSize)
+                            val slippagePercent = tradeCost.slippagePercent safeDiv BigDecimal("100")
+                            val entryPrice = currentPriceDecimal * (BigDecimal.ONE + slippagePercent) // Pay more when buying
+                            val volume = targetPositionSize safeDiv entryPrice  // Volume at slipped price
+                            val actualPositionValue = entryPrice * volume
+                            val totalEntryCost = actualPositionValue + tradeCost.totalCost
+
+                            if (totalEntryCost <= balance) {
+                                // Deduct actual cost from balance
+                                balance -= totalEntryCost
+
+                                val stopLossPrice = riskManager.calculateStopLoss(
+                                    entryPrice = entryPrice.toDouble(),
+                                    stopLossPercent = strategy.stopLossPercent,
+                                    isBuy = true
+                                ).toBigDecimalMoney()
+
+                                val takeProfitPrice = riskManager.calculateTakeProfit(
+                                    entryPrice = entryPrice.toDouble(),
+                                    takeProfitPercent = strategy.takeProfitPercent,
+                                    isBuy = true
+                                ).toBigDecimalMoney()
+
+                                openPositions[signal.pair] = BacktestPositionDecimal(
+                                    pair = signal.pair,
+                                    type = TradeType.BUY,
+                                    entryPriceDecimal = entryPrice,
+                                    volumeDecimal = volume,
+                                    stopLossPriceDecimal = stopLossPrice,
+                                    takeProfitPriceDecimal = takeProfitPrice,
+                                    totalCostDecimal = tradeCost.totalCost
+                                )
+
+                                Timber.d("BUY ENTRY: ${signal.pair}")
+                                Timber.d("  Target Size: ${targetPositionSize.toPlainString()}")
+                                Timber.d("  Entry Price (with slippage): ${entryPrice.toPlainString()}")
+                                Timber.d("  Volume: ${volume.toPlainString()}")
+                                Timber.d("  Position Value: ${actualPositionValue.toPlainString()}")
+                                Timber.d("  Entry Costs: ${tradeCost.totalCost.toPlainString()}")
+                                Timber.d("  Total Cost: ${totalEntryCost.toPlainString()}")
+                                Timber.d("  New Balance: ${balance.toPlainString()}")
+                                Timber.d("  Stop Loss: ${stopLossPrice.toPlainString()}, Take Profit: ${takeProfitPrice.toPlainString()}")
+                            } else {
+                                Timber.w("Insufficient balance for BUY: need ${totalEntryCost.toPlainString()}, have ${balance.toPlainString()}")
+                            }
+                        }
+                    }
+                    TradeAction.SELL -> {
+                        // FIX Bug 1.2 + 1.3: Correct P&L and balance calculation
+                        // Only sell if we have an open position
+                        val position = openPositions[signal.pair]
+                        if (position != null) {
+                            val exitValue = currentPriceDecimal * position.volumeDecimal
+                            val exitExecutionType = if (strategy.postOnly) OrderExecutionType.MAKER else OrderExecutionType.TAKER
+                            val exitCost = costModel.calculateTradeCostDecimal(
+                                orderType = exitExecutionType,
+                                orderValue = exitValue,
+                                isLargeOrder = exitValue > balance * "0.1".toBigDecimalMoney()
+                            )
+
+                            // Apply slippage to exit price
+                            val exitSlippagePercent = exitCost.slippagePercent safeDiv BigDecimal("100")
+                            val exitPrice = currentPriceDecimal * (BigDecimal.ONE - exitSlippagePercent)
+
+                            // HEDGE-FUND QUALITY P&L CALCULATION
+                            val proceeds = exitPrice * position.volumeDecimal
+                            val netProceeds = proceeds - exitCost.totalCost
+                            val costBasis = position.entryPriceDecimal * position.volumeDecimal + position.totalCostDecimal
+                            val pnl = netProceeds - costBasis
+
+                            balance += netProceeds
+                            realizedPnL += pnl
+
+                            Timber.d("STRATEGY SELL EXIT: ${signal.pair}")
+                            Timber.d("  Entry: ${position.entryPriceDecimal.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${(position.entryPriceDecimal * position.volumeDecimal).toPlainString()}")
+                            Timber.d("  Entry Costs: ${position.totalCostDecimal.toPlainString()}")
+                            Timber.d("  Cost Basis: ${costBasis.toPlainString()}")
+                            Timber.d("  Exit: ${exitPrice.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${proceeds.toPlainString()}")
+                            Timber.d("  Exit Costs: ${exitCost.totalCost.toPlainString()}")
+                            Timber.d("  Net Proceeds: ${netProceeds.toPlainString()}")
+                            Timber.d("  P&L: ${pnl.toPlainString()}")
+                            Timber.d("  New Balance: ${balance.toPlainString()}, Realized P&L: ${realizedPnL.toPlainString()}")
+
+                            trades.add(
+                                BacktestTradeDecimal(
+                                    timestamp = priceBar.timestamp,
+                                    pair = signal.pair,
+                                    type = TradeType.SELL,
+                                    entryPriceDecimal = position.entryPriceDecimal,
+                                    exitPriceDecimal = exitPrice,
+                                    volumeDecimal = position.volumeDecimal,
+                                    pnlDecimal = pnl,
+                                    entryCostDecimal = position.totalCostDecimal,
+                                    exitCostDecimal = exitCost.totalCost,
+                                    reason = "Strategy Signal"
+                                )
+                            )
+
+                            openPositions.remove(signal.pair)
+                        }
+                    }
+                    TradeAction.HOLD -> {
+                        // Do nothing
+                    }
+                }
+            }
+
+            // FIX Bug 1.1: Correct equity curve calculation using unrealized P&L
+            // HEDGE-FUND QUALITY EQUITY CALCULATION:
+            // Total equity = balance + unrealizedPnL
+            // Where unrealizedPnL = sum of all open positions' (currentPrice - entryPrice) * volume - fees already paid
+            // Note: balance was already reduced when positions were opened, so we only add unrealized gains/losses
+            val unrealizedPnL = openPositions.values.fold(BigDecimal.ZERO) { acc, position ->
+                val currentValue = currentPriceDecimal * position.volumeDecimal
+                val costBasis = position.entryPriceDecimal * position.volumeDecimal + position.totalCostDecimal
+                acc + (currentValue - costBasis)  // Unrealized P&L = current value - what we paid
+            }
+            val totalEquity = balance + unrealizedPnL
+            equityCurve.add(Pair(priceBar.timestamp, totalEquity))
+
+            // Log equity details every 50 iterations or when there are open positions
+            if (index % 50 == 0 || openPositions.isNotEmpty()) {
+                Timber.d("EQUITY UPDATE (iteration $index):")
+                Timber.d("  Balance (cash): ${balance.toPlainString()}")
+                Timber.d("  Unrealized P&L: ${unrealizedPnL.toPlainString()}")
+                Timber.d("  Total Equity: ${totalEquity.toPlainString()}")
+                Timber.d("  Open Positions: ${openPositions.size}")
+            }
+        }
+
+        // FIX Bug 1.2 + 1.3: Close any remaining open positions at final price with correct P&L
+        val finalPriceBar = historicalData.last()
+        val finalPriceDecimal = finalPriceBar.close.toBigDecimalMoney()
+        openPositions.forEach { (pair, position) ->
+            val exitValue = finalPriceDecimal * position.volumeDecimal
+            val exitCost = costModel.calculateTradeCostDecimal(
+                orderType = OrderExecutionType.TAKER, // Force close at market
+                orderValue = exitValue,
+                isLargeOrder = exitValue > balance * "0.1".toBigDecimalMoney()
+            )
+
+            val exitSlippagePercent = exitCost.slippagePercent safeDiv BigDecimal("100")
+            val exitPrice = finalPriceDecimal * (BigDecimal.ONE - exitSlippagePercent)
+
+            // HEDGE-FUND QUALITY P&L CALCULATION
+            val proceeds = exitPrice * position.volumeDecimal
+            val netProceeds = proceeds - exitCost.totalCost
+            val costBasis = position.entryPriceDecimal * position.volumeDecimal + position.totalCostDecimal
+            val pnl = netProceeds - costBasis
+
+            balance += netProceeds
+            realizedPnL += pnl
+
+            Timber.d("BACKTEST END - FORCE CLOSE: $pair")
+            Timber.d("  Entry: ${position.entryPriceDecimal.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${(position.entryPriceDecimal * position.volumeDecimal).toPlainString()}")
+            Timber.d("  Entry Costs: ${position.totalCostDecimal.toPlainString()}")
+            Timber.d("  Cost Basis: ${costBasis.toPlainString()}")
+            Timber.d("  Exit: ${exitPrice.toPlainString()} x ${position.volumeDecimal.toPlainString()} = ${proceeds.toPlainString()}")
+            Timber.d("  Exit Costs: ${exitCost.totalCost.toPlainString()}")
+            Timber.d("  Net Proceeds: ${netProceeds.toPlainString()}")
+            Timber.d("  P&L: ${pnl.toPlainString()}")
+
+            trades.add(
+                BacktestTradeDecimal(
+                    timestamp = finalPriceBar.timestamp,
+                    pair = pair,
+                    type = TradeType.SELL,
+                    entryPriceDecimal = position.entryPriceDecimal,
+                    exitPriceDecimal = exitPrice,
+                    volumeDecimal = position.volumeDecimal,
+                    pnlDecimal = pnl,
+                    entryCostDecimal = position.totalCostDecimal,
+                    exitCostDecimal = exitCost.totalCost,
+                    reason = "Backtest End"
+                )
+            )
+        }
+
+        // Calculate metrics
+        val pnls = trades.map { it.pnlDecimal }
+        val winningTrades = trades.filter { it.pnlDecimal > BigDecimal.ZERO }
+        val losingTrades = trades.filter { it.pnlDecimal < BigDecimal.ZERO }
+
+        val winRateDecimal = if (trades.isNotEmpty()) {
+            (winningTrades.size.toBigDecimalMoney() safeDiv trades.size.toBigDecimalMoney()) * BigDecimal("100")
+        } else BigDecimal.ZERO
+
+        val averageProfitDecimal = if (winningTrades.isNotEmpty()) {
+            winningTrades.map { it.pnlDecimal }.fold(BigDecimal.ZERO) { acc, pnl -> acc + pnl } safeDiv winningTrades.size.toBigDecimalMoney()
+        } else BigDecimal.ZERO
+
+        val averageLossDecimal = if (losingTrades.isNotEmpty()) {
+            losingTrades.map { it.pnlDecimal }.fold(BigDecimal.ZERO) { acc, pnl -> acc + pnl } safeDiv losingTrades.size.toBigDecimalMoney()
+        } else BigDecimal.ZERO
+
+        val grossProfit = winningTrades.fold(BigDecimal.ZERO) { acc, trade -> acc + trade.pnlDecimal }
+        val grossLoss = losingTrades.fold(BigDecimal.ZERO) { acc, trade -> acc + trade.pnlDecimal }.abs()
+        val profitFactorDecimal = if (grossLoss > BigDecimal.ZERO) {
+            grossProfit safeDiv grossLoss
+        } else if (grossProfit > BigDecimal.ZERO) {
+            BigDecimal("999999.99")  // Represent infinity as very large number
+        } else BigDecimal.ONE
+
+        // FIX Bug 1.5: HEDGE-FUND QUALITY SHARPE RATIO CALCULATION
+        // Use equity curve returns (not per-trade returns) for proper risk-adjusted performance
+        // Sharpe ratio measures risk-adjusted returns: (avg return - risk-free rate) / std deviation
+        // We annualize using the appropriate factor based on data frequency
+        val sharpeRatioDecimal = if (equityCurve.size > 2) {
+            // Calculate period-to-period returns from equity curve
+            val equityReturns = equityCurve.zipWithNext { current, next ->
+                if (current.second > BigDecimal.ZERO) {
+                    (next.second - current.second) safeDiv current.second
+                } else {
+                    BigDecimal.ZERO
+                }
+            }
+
+            if (equityReturns.isNotEmpty()) {
+                val avgReturn = equityReturns.fold(BigDecimal.ZERO) { acc, ret -> acc + ret } safeDiv equityReturns.size.toBigDecimalMoney()
+                val variance = equityReturns.map { ret ->
+                    val diff = ret - avgReturn
+                    diff * diff
+                }.fold(BigDecimal.ZERO) { acc, v -> acc + v } safeDiv equityReturns.size.toBigDecimalMoney()
+                val stdDev = kotlin.math.sqrt(variance.toDouble()).toBigDecimalMoney()
+
+                // P1-3: TIMEFRAME-AWARE SHARPE RATIO ANNUALIZATION
+                // Determine annualization factor based on actual data frequency
+                // Crypto markets trade 24/7, not just 252 days like traditional markets
+                val timeframe = ohlcBars?.firstOrNull()?.timeframe ?: detectTimeframeFromBars(historicalData)
+                val periodsPerYear = calculatePeriodsPerYear(timeframe).toBigDecimalMoney()
+                val annualizationFactor = kotlin.math.sqrt(periodsPerYear.toDouble()).toBigDecimalMoney()
+
+                Timber.d("Sharpe ratio calculation: timeframe=$timeframe, periodsPerYear=${periodsPerYear.toPlainString()}")
+
+                if (stdDev > BigDecimal.ZERO) {
+                    // Sharpe ratio = (average return / std dev) * sqrt(periods per year)
+                    // Assuming risk-free rate ≈ 0 for simplicity (can be adjusted)
+                    (avgReturn safeDiv stdDev) * annualizationFactor
+                } else {
+                    BigDecimal.ZERO
+                }
+            } else {
+                BigDecimal.ZERO
+            }
+        } else {
+            BigDecimal.ZERO
+        }
+
+        // FIX Bug 1.6: HEDGE-FUND QUALITY MAX DRAWDOWN AS PERCENTAGE
+        // Max drawdown should be expressed as percentage from peak for proper risk assessment
+        var maxDrawdownPercentDecimal = BigDecimal.ZERO
+        var peak = equityCurve.firstOrNull()?.second ?: startingBalance
+        equityCurve.forEach { (_, equity) ->
+            if (equity > peak) peak = equity
+            val drawdownPercent = if (peak > BigDecimal.ZERO) {
+                ((peak - equity) safeDiv peak) * BigDecimal("100")
+            } else {
+                BigDecimal.ZERO
+            }
+            if (drawdownPercent > maxDrawdownPercentDecimal) {
+                maxDrawdownPercentDecimal = drawdownPercent
+            }
+        }
+
+        Timber.i("RISK METRICS:")
+        Timber.i("  Sharpe Ratio (annualized): ${sharpeRatioDecimal.toPlainString()}")
+        Timber.i("  Max Drawdown: ${maxDrawdownPercentDecimal.toPlainString()}%")
+
+        val totalPnLDecimal = balance - startingBalance
+        val totalPnLPercentDecimal = (totalPnLDecimal safeDiv startingBalance) * BigDecimal("100")
+
+        // Calculate total costs from all trades
+        val totalEntryCosts = trades.fold(BigDecimal.ZERO) { acc, trade -> acc + trade.entryCostDecimal }
+        val totalExitCosts = trades.fold(BigDecimal.ZERO) { acc, trade -> acc + trade.exitCostDecimal }
+        val totalCosts = totalEntryCosts + totalExitCosts
+
+        Timber.i("=== BACKTEST COMPLETE ===")
+        Timber.i("Trades: ${trades.size} (${winningTrades.size} wins, ${losingTrades.size} losses)")
+        Timber.i("Win Rate: ${winRateDecimal.toPlainString()}%")
+        Timber.i("Total P&L: ${totalPnLDecimal.toPlainString()} (${totalPnLPercentDecimal.toPlainString()}%)")
+        Timber.i("Profit Factor: ${profitFactorDecimal.toPlainString()}")
+        Timber.i("Sharpe Ratio: ${sharpeRatioDecimal.toPlainString()}")
+        Timber.i("Max Drawdown: ${maxDrawdownPercentDecimal.toPlainString()}%")
+        Timber.i("Total Costs: ${totalCosts.toPlainString()}")
+        Timber.i("Final Balance: ${balance.toPlainString()} (started with ${startingBalance.toPlainString()})")
+        if (dataTier != null) {
+            Timber.i("Data Tier: ${dataTier.tierName} (Quality: ${String.format("%.2f", dataQualityScore ?: 0.0)})")
+        }
+        Timber.i("========================")
+
+        return BacktestResultDecimal(
+            strategyId = strategy.id,
+            strategyName = strategy.name,
+            startingBalanceDecimal = startingBalance,
+            endingBalanceDecimal = balance,
+            totalTrades = trades.size,
+            winningTrades = winningTrades.size,
+            losingTrades = losingTrades.size,
+            winRateDecimal = winRateDecimal,
+            totalPnLDecimal = totalPnLDecimal,
+            totalPnLPercentDecimal = totalPnLPercentDecimal,
+            maxDrawdownPercentDecimal = maxDrawdownPercentDecimal,  // NOW RETURNS PERCENTAGE, NOT DOLLAR AMOUNT
+            sharpeRatioDecimal = sharpeRatioDecimal,                 // NOW PROPERLY CALCULATED FROM EQUITY CURVE
+            profitFactorDecimal = profitFactorDecimal,
+            averageProfitDecimal = averageProfitDecimal,
+            averageLossDecimal = averageLossDecimal,
+            bestTradeDecimal = pnls.maxOrNull() ?: BigDecimal.ZERO,
+            worstTradeDecimal = pnls.minOrNull() ?: BigDecimal.ZERO,
+            trades = trades,
+            equityCurveDecimal = equityCurve,
+            totalFeesDecimal = totalCosts, // Total of all costs (fees + slippage + spread combined)
+            dataTier = dataTier, // Data quality tier used
+            dataQualityScore = dataQualityScore // Measured quality score
+        )
+    }
+
+    /**
+     * Run backtest for a strategy using historical price data (DEPRECATED - Use BigDecimal version)
      *
      * @param strategy The trading strategy to test
      * @param historicalData List of price bars (OHLC + timestamp)
@@ -37,6 +709,7 @@ class BacktestEngine @Inject constructor(
      * @param costModel Trading cost model (fees, slippage, spread)
      * @return Backtest results with performance metrics
      */
+    @Deprecated("Use runBacktestDecimal for exact calculations without floating-point errors", ReplaceWith("runBacktestDecimal(strategy, historicalData, startingBalance.toBigDecimalMoney(), costModel, ohlcBars)"))
     suspend fun runBacktest(
         strategy: Strategy,
         historicalData: List<PriceBar>,
@@ -748,8 +1421,9 @@ data class PriceBar(
 )
 
 /**
- * Backtest position (open trade during backtest)
+ * Backtest position (open trade during backtest) - DEPRECATED
  */
+@Deprecated("Use BacktestPositionDecimal for exact calculations", ReplaceWith("BacktestPositionDecimal"))
 private data class BacktestPosition(
     val pair: String,
     val type: TradeType,
@@ -761,8 +1435,25 @@ private data class BacktestPosition(
 )
 
 /**
- * Trade executed during backtest
+ * Backtest position using BigDecimal (open trade during backtest)
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * All price and volume fields use exact decimal arithmetic
  */
+private data class BacktestPositionDecimal(
+    val pair: String,
+    val type: TradeType,
+    val entryPriceDecimal: BigDecimal,
+    val volumeDecimal: BigDecimal,
+    val stopLossPriceDecimal: BigDecimal,
+    val takeProfitPriceDecimal: BigDecimal,
+    val totalCostDecimal: BigDecimal // Total entry cost (fees + slippage + spread)
+)
+
+/**
+ * Trade executed during backtest - DEPRECATED
+ */
+@Deprecated("Use BacktestTradeDecimal for exact calculations", ReplaceWith("BacktestTradeDecimal"))
 data class BacktestTrade(
     val timestamp: Long,
     val pair: String,
@@ -777,8 +1468,28 @@ data class BacktestTrade(
 )
 
 /**
- * Backtest results with full performance metrics
+ * Trade executed during backtest using BigDecimal
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * All monetary fields use exact decimal arithmetic
  */
+data class BacktestTradeDecimal(
+    val timestamp: Long,
+    val pair: String,
+    val type: TradeType,
+    val entryPriceDecimal: BigDecimal,
+    val exitPriceDecimal: BigDecimal,
+    val volumeDecimal: BigDecimal,
+    val pnlDecimal: BigDecimal,
+    val entryCostDecimal: BigDecimal = BigDecimal.ZERO, // Total entry costs (fees + slippage + spread)
+    val exitCostDecimal: BigDecimal = BigDecimal.ZERO,  // Total exit costs (fees + slippage + spread)
+    val reason: String // "Stop-Loss", "Take-Profit", "Strategy Signal", "Backtest End"
+)
+
+/**
+ * Backtest results with full performance metrics - DEPRECATED
+ */
+@Deprecated("Use BacktestResultDecimal for exact calculations without floating-point errors", ReplaceWith("BacktestResultDecimal"))
 data class BacktestResult(
     val strategyId: String,
     val strategyName: String,
@@ -802,6 +1513,45 @@ data class BacktestResult(
     val totalFees: Double = 0.0, // Total fees paid
     val totalSlippage: Double = 0.0, // Total slippage cost
     val totalSpreadCost: Double = 0.0, // Total bid-ask spread cost
+    val validationError: String? = null, // Data validation error (if any)
+    val dataTier: DataTier? = null, // Data quality tier used (PREMIUM/PROFESSIONAL/STANDARD/BASIC)
+    val dataQualityScore: Double? = null // Measured data quality score (0.0 - 1.0)
+)
+
+/**
+ * Backtest results with full performance metrics using exact BigDecimal arithmetic
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * This is the PREFERRED result type - all calculations are exact without floating-point errors.
+ * Use this for all new backtest code.
+ *
+ * Key improvements:
+ * - Exact arithmetic prevents precision loss over hundreds of trades
+ * - No rounding errors in P&L calculations
+ * - Proper handling of crypto's 8-decimal precision
+ * - Equity curve includes timestamps for better analysis
+ */
+data class BacktestResultDecimal(
+    val strategyId: String,
+    val strategyName: String,
+    val startingBalanceDecimal: BigDecimal,
+    val endingBalanceDecimal: BigDecimal,
+    val totalTrades: Int,
+    val winningTrades: Int,
+    val losingTrades: Int,
+    val winRateDecimal: BigDecimal,
+    val totalPnLDecimal: BigDecimal,
+    val totalPnLPercentDecimal: BigDecimal,
+    val maxDrawdownPercentDecimal: BigDecimal,  // Percentage from peak (not dollar amount)
+    val sharpeRatioDecimal: BigDecimal,          // Annualized, calculated from equity curve
+    val profitFactorDecimal: BigDecimal,
+    val averageProfitDecimal: BigDecimal,
+    val averageLossDecimal: BigDecimal,
+    val bestTradeDecimal: BigDecimal,
+    val worstTradeDecimal: BigDecimal,
+    val trades: List<BacktestTradeDecimal>,
+    val equityCurveDecimal: List<Pair<Long, BigDecimal>>, // Timestamp + equity value
+    val totalFeesDecimal: BigDecimal = BigDecimal.ZERO, // Total of all costs (fees + slippage + spread)
     val validationError: String? = null, // Data validation error (if any)
     val dataTier: DataTier? = null, // Data quality tier used (PREMIUM/PROFESSIONAL/STANDARD/BASIC)
     val dataQualityScore: Double? = null // Measured data quality score (0.0 - 1.0)

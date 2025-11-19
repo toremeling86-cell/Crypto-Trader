@@ -971,6 +971,94 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 19 to 20
+     *
+     * Changes:
+     * - Add BigDecimal support (Phase 2.9 - BigDecimal Migration)
+     * - Add TEXT columns for BigDecimal values alongside existing REAL columns
+     * - Maintains backward compatibility during migration
+     */
+    val MIGRATION_19_20 = object : Migration(19, 20) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            Timber.i("=== Starting Database Migration 19 → 20 ===")
+            Timber.i("Purpose: Add BigDecimal support for exact monetary calculations")
+
+            // ===== TRADES TABLE =====
+            Timber.d("Adding BigDecimal columns to trades table...")
+            database.execSQL("ALTER TABLE trades ADD COLUMN price_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE trades ADD COLUMN volume_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE trades ADD COLUMN cost_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE trades ADD COLUMN fee_decimal TEXT DEFAULT NULL")
+
+            // ===== PORTFOLIO_SNAPSHOTS TABLE =====
+            Timber.d("Adding BigDecimal columns to portfolio_snapshots table...")
+            database.execSQL("ALTER TABLE portfolio_snapshots ADD COLUMN total_value_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE portfolio_snapshots ADD COLUMN total_pnl_decimal TEXT DEFAULT NULL")
+
+            // ===== STRATEGIES TABLE =====
+            Timber.d("Adding BigDecimal columns to strategies table...")
+            database.execSQL("ALTER TABLE strategies ADD COLUMN total_profit_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE strategies ADD COLUMN max_drawdown_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE strategies ADD COLUMN avg_win_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE strategies ADD COLUMN avg_loss_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE strategies ADD COLUMN largest_win_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE strategies ADD COLUMN largest_loss_decimal TEXT DEFAULT NULL")
+
+            // ===== BACKTEST_RUNS TABLE =====
+            Timber.d("Adding BigDecimal columns to backtest_runs table...")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN starting_balance_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN ending_balance_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN total_pnl_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN max_drawdown_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE backtest_runs ADD COLUMN sharpe_ratio_decimal TEXT DEFAULT NULL")
+
+            // ===== OHLC_BARS TABLE =====
+            Timber.d("Adding BigDecimal columns to ohlc_bars table...")
+            database.execSQL("ALTER TABLE ohlc_bars ADD COLUMN open_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE ohlc_bars ADD COLUMN high_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE ohlc_bars ADD COLUMN low_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE ohlc_bars ADD COLUMN close_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE ohlc_bars ADD COLUMN volume_decimal TEXT DEFAULT NULL")
+
+            Timber.i("✅ Migration 19 → 20 complete")
+            Timber.i("   - BigDecimal columns added to 5 tables")
+            Timber.i("   - Backward compatibility maintained (Double columns preserved)")
+            Timber.i("   - Next step: Populate BigDecimal columns from existing Double values")
+        }
+    }
+
+    /**
+     * Migration from version 20 to 21
+     *
+     * Changes:
+     * - Add BigDecimal columns to positions table (Phase 2.9 - BigDecimal Migration)
+     * - Maintains backward compatibility during migration
+     */
+    val MIGRATION_20_21 = object : Migration(20, 21) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            Timber.i("=== Starting Database Migration 20 → 21 ===")
+            Timber.i("Purpose: Add BigDecimal support to positions table")
+
+            // ===== POSITIONS TABLE =====
+            Timber.d("Adding BigDecimal columns to positions table...")
+            database.execSQL("ALTER TABLE positions ADD COLUMN quantity_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN entry_price_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN stop_loss_price_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN take_profit_price_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN exit_price_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN unrealized_pnl_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN unrealized_pnl_percent_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN realized_pnl_decimal TEXT DEFAULT NULL")
+            database.execSQL("ALTER TABLE positions ADD COLUMN realized_pnl_percent_decimal TEXT DEFAULT NULL")
+
+            Timber.i("✅ Migration 20 → 21 complete")
+            Timber.i("   - BigDecimal columns added to positions table")
+            Timber.i("   - 9 decimal columns for exact position P&L calculations")
+            Timber.i("   - Backward compatibility maintained (Double columns preserved)")
+        }
+    }
+
+    /**
      * Get all migrations
      */
     fun getAllMigrations(): Array<Migration> {
@@ -992,7 +1080,9 @@ object DatabaseMigrations {
             MIGRATION_15_16,
             MIGRATION_16_17,
             MIGRATION_17_18,
-            MIGRATION_18_19
+            MIGRATION_18_19,
+            MIGRATION_19_20,
+            MIGRATION_20_21
         )
     }
 }

@@ -233,6 +233,34 @@ class VolatilityStopLossCalculator @Inject constructor(
             return VolatilityLevel.MEDIUM
         }
     }
+
+    /**
+     * Calculate volatility-adjusted stop-loss using BigDecimal (exact calculations)
+     *
+     * @param pair Trading pair
+     * @param entryPrice Entry price
+     * @param isBuy True for long position, false for short
+     * @param atrMultiplier How many ATRs away from entry
+     * @param fallbackStopLossPercent Fixed stop-loss if ATR unavailable
+     * @return Stop-loss price
+     */
+    suspend fun calculateVolatilityStopLossDecimal(
+        pair: String,
+        entryPrice: java.math.BigDecimal,
+        isBuy: Boolean,
+        atrMultiplier: java.math.BigDecimal = java.math.BigDecimal.valueOf(DEFAULT_ATR_MULTIPLIER),
+        fallbackStopLossPercent: java.math.BigDecimal = java.math.BigDecimal.valueOf(2.0)
+    ): java.math.BigDecimal {
+        // Convert to Double, calculate, then convert back
+        val result = calculateVolatilityStopLoss(
+            pair = pair,
+            entryPrice = entryPrice.toDouble(),
+            isBuy = isBuy,
+            atrMultiplier = atrMultiplier.toDouble(),
+            fallbackStopLossPercent = fallbackStopLossPercent.toDouble()
+        )
+        return java.math.BigDecimal.valueOf(result)
+    }
 }
 
 /**

@@ -2,6 +2,7 @@ package com.cryptotrader.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import com.cryptotrader.data.local.dao.*
 import com.cryptotrader.data.local.entities.*
 
@@ -9,6 +10,7 @@ import com.cryptotrader.data.local.entities.*
     entities = [
         TradeEntity::class,
         StrategyEntity::class,
+        PositionEntity::class,
         PortfolioSnapshotEntity::class,
         MarketSnapshotEntity::class,
         AIMarketAnalysisEntity::class,
@@ -26,13 +28,15 @@ import com.cryptotrader.data.local.entities.*
         DataQuarterCoverageEntity::class,
         KnowledgeBaseEntity::class
     ],
-    version = 19, // Migration 18→19: Add learningEnabled to meta_analyses, create knowledge_base table for cross-strategy learning
+    version = 21, // Migration 20→21: Add BigDecimal support to positions table (Phase 2.9)
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     // ApiKeyDao removed - API keys are now stored only in EncryptedSharedPreferences
     abstract fun tradeDao(): TradeDao
     abstract fun strategyDao(): StrategyDao
+    abstract fun positionDao(): PositionDao
     abstract fun portfolioSnapshotDao(): PortfolioSnapshotDao
     abstract fun marketSnapshotDao(): MarketSnapshotDao
     abstract fun aiMarketAnalysisDao(): AIMarketAnalysisDao

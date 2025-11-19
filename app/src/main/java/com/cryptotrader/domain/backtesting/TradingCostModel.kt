@@ -1,10 +1,18 @@
 package com.cryptotrader.domain.backtesting
 
+import com.cryptotrader.utils.toBigDecimalMoney
+import com.cryptotrader.utils.safeDiv
 import timber.log.Timber
+import java.math.BigDecimal
 
 /**
  * Trading cost model for realistic backtesting
  * Includes fees, slippage, and spread costs
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * - All cost calculations now use BigDecimal for exact arithmetic
+ * - Double fields deprecated but kept for backward compatibility
+ * - New code should use *Decimal methods exclusively
  *
  * Kraken Spot Trading Fees (as of 2024):
  * - Maker: 0.16% for < $50K volume
@@ -22,15 +30,27 @@ import timber.log.Timber
  * - Very large orders (>$100K): Can be 0.2-0.5% or more
  */
 data class TradingCostModel(
+    @Deprecated("Use makerFeeDecimal for exact calculations", ReplaceWith("makerFeeDecimal"))
     val makerFee: Double = 0.0016,  // 0.16% - Kraken maker fee (0-100k volume tier)
+    val makerFeeDecimal: BigDecimal = makerFee.toBigDecimalMoney(),
+
+    @Deprecated("Use takerFeeDecimal for exact calculations", ReplaceWith("takerFeeDecimal"))
     val takerFee: Double = 0.0026,  // 0.26% - Kraken taker fee (0-100k volume tier)
+    val takerFeeDecimal: BigDecimal = takerFee.toBigDecimalMoney(),
+
+    @Deprecated("Use slippagePercentDecimal for exact calculations", ReplaceWith("slippagePercentDecimal"))
     val slippagePercent: Double = 0.05,  // 0.05% average slippage
+    val slippagePercentDecimal: BigDecimal = slippagePercent.toBigDecimalMoney(),
+
+    @Deprecated("Use spreadPercentDecimal for exact calculations", ReplaceWith("spreadPercentDecimal"))
     val spreadPercent: Double = 0.02,  // 0.02% bid-ask spread cost
+    val spreadPercentDecimal: BigDecimal = spreadPercent.toBigDecimalMoney(),
+
     val useRealisticSlippage: Boolean = true,  // Enable dynamic slippage based on volume
     val useTieredFees: Boolean = false  // Use Kraken's tiered fee structure
 ) {
     /**
-     * Calculate total cost for a trade
+     * Calculate total cost for a trade (DEPRECATED - Use BigDecimal version)
      *
      * @param orderType Whether this is a market order (taker) or limit order (maker)
      * @param orderValue Total value of the order in quote currency
@@ -38,6 +58,7 @@ data class TradingCostModel(
      * @param isLargeOrder Whether this order is large relative to market depth
      * @return TradeCost breakdown
      */
+    @Deprecated("Use calculateTradeCostDecimal for exact calculations", ReplaceWith("calculateTradeCostDecimal(orderType, orderValue.toBigDecimalMoney(), volume30Day.toBigDecimalMoney(), isLargeOrder)"))
     fun calculateTradeCost(
         orderType: OrderExecutionType,
         orderValue: Double,
@@ -157,6 +178,126 @@ data class TradingCostModel(
 
         return slippageCost
     }
+
+    /**
+     * Calculate total cost for a trade using exact BigDecimal arithmetic
+     *
+     * @param orderType Whether this is a market order (taker) or limit order (maker)
+     * @param orderValue Total value of the order in quote currency
+     * @param volume30Day 30-day trading volume for tiered fee calculation
+     * @param isLargeOrder Whether this order is large relative to market depth
+     * @return TradeCostDecimal breakdown with exact calculations
+     */
+    fun calculateTradeCostDecimal(
+        orderType: OrderExecutionType,
+        orderValue: BigDecimal,
+        volume30Day: BigDecimal = BigDecimal.ZERO,
+        isLargeOrder: Boolean = false
+    ): TradeCostDecimal {
+        // 1. Fee calculation
+        val baseFee = when (orderType) {
+            OrderExecutionType.MAKER -> if (useTieredFees) getTieredMakerFeeDecimal(volume30Day) else makerFeeDecimal
+            OrderExecutionType.TAKER -> if (useTieredFees) getTieredTakerFeeDecimal(volume30Day) else takerFeeDecimal
+        }
+        val feeAmount = orderValue * baseFee
+
+        // 2. Slippage calculation
+        val slippageAmount = if (useRealisticSlippage) {
+            calculateRealisticSlippageDecimal(orderValue, isLargeOrder)
+        } else {
+            orderValue * (slippagePercentDecimal safeDiv BigDecimal("100"))
+        }
+
+        // 3. Spread cost (only HALF the spread - we pay one side)
+        val halfSpreadPercent = spreadPercentDecimal safeDiv BigDecimal("2")
+        val spreadCost = orderValue * (halfSpreadPercent safeDiv BigDecimal("100"))
+
+        Timber.d("Spread cost calculation: orderValue=${orderValue.toPlainString()}, " +
+                "fullSpread=${spreadPercentDecimal.toPlainString()}%, " +
+                "halfSpread=${halfSpreadPercent.toPlainString()}%, " +
+                "cost=${spreadCost.toPlainString()}")
+
+        val totalCost = feeAmount + slippageAmount + spreadCost
+        val totalCostPercent = (totalCost safeDiv orderValue) * BigDecimal("100")
+
+        // Comprehensive cost breakdown logging
+        Timber.i("=== TRADING COST BREAKDOWN ===")
+        Timber.i("Order Value: $${orderValue.toPlainString()}")
+        Timber.i("Exchange Fee (${(baseFee * BigDecimal("100")).toPlainString()}%): $${feeAmount.toPlainString()}")
+        Timber.i("Spread Cost (${halfSpreadPercent.toPlainString()}% half-spread): $${spreadCost.toPlainString()}")
+        Timber.i("Slippage (${((slippageAmount safeDiv orderValue) * BigDecimal("100")).toPlainString()}%): $${slippageAmount.toPlainString()}")
+        Timber.i("Total Cost: $${totalCost.toPlainString()} (${totalCostPercent.toPlainString()}% of order)")
+        Timber.i("==============================")
+
+        return TradeCostDecimal(
+            feeAmount = feeAmount,
+            feePercent = baseFee * BigDecimal("100"),
+            slippageAmount = slippageAmount,
+            slippagePercent = (slippageAmount safeDiv orderValue) * BigDecimal("100"),
+            spreadCost = spreadCost,
+            spreadPercent = halfSpreadPercent,
+            totalCost = totalCost,
+            totalCostPercent = totalCostPercent
+        )
+    }
+
+    /**
+     * Get Kraken tiered maker fee based on 30-day volume (BigDecimal version)
+     */
+    private fun getTieredMakerFeeDecimal(volume30Day: BigDecimal): BigDecimal {
+        return when {
+            volume30Day < BigDecimal("50000") -> BigDecimal("0.0016")      // 0.16%
+            volume30Day < BigDecimal("100000") -> BigDecimal("0.0014")     // 0.14%
+            volume30Day < BigDecimal("250000") -> BigDecimal("0.0012")     // 0.12%
+            volume30Day < BigDecimal("500000") -> BigDecimal("0.0010")     // 0.10%
+            volume30Day < BigDecimal("1000000") -> BigDecimal("0.0008")    // 0.08%
+            volume30Day < BigDecimal("2500000") -> BigDecimal("0.0006")    // 0.06%
+            volume30Day < BigDecimal("5000000") -> BigDecimal("0.0004")    // 0.04%
+            volume30Day < BigDecimal("10000000") -> BigDecimal("0.0002")   // 0.02%
+            else -> BigDecimal.ZERO                                         // 0.00%
+        }
+    }
+
+    /**
+     * Get Kraken tiered taker fee based on 30-day volume (BigDecimal version)
+     */
+    private fun getTieredTakerFeeDecimal(volume30Day: BigDecimal): BigDecimal {
+        return when {
+            volume30Day < BigDecimal("50000") -> BigDecimal("0.0026")      // 0.26%
+            volume30Day < BigDecimal("100000") -> BigDecimal("0.0024")     // 0.24%
+            volume30Day < BigDecimal("250000") -> BigDecimal("0.0022")     // 0.22%
+            volume30Day < BigDecimal("500000") -> BigDecimal("0.0020")     // 0.20%
+            volume30Day < BigDecimal("1000000") -> BigDecimal("0.0018")    // 0.18%
+            volume30Day < BigDecimal("2500000") -> BigDecimal("0.0016")    // 0.16%
+            volume30Day < BigDecimal("5000000") -> BigDecimal("0.0014")    // 0.14%
+            volume30Day < BigDecimal("10000000") -> BigDecimal("0.0012")   // 0.12%
+            else -> BigDecimal("0.0010")                                    // 0.10%
+        }
+    }
+
+    /**
+     * Calculate realistic slippage based on order size (BigDecimal version)
+     * Larger orders experience more slippage due to market depth
+     */
+    private fun calculateRealisticSlippageDecimal(orderValue: BigDecimal, isLargeOrder: Boolean): BigDecimal {
+        // Apply multiplier to the PERCENTAGE, not the dollar amount
+        val adjustedSlippagePercent = when {
+            isLargeOrder -> slippagePercentDecimal * BigDecimal("3.0")           // Very large orders: 3x slippage %
+            orderValue > BigDecimal("100000") -> slippagePercentDecimal * BigDecimal("2.0")   // >$100K: 2x slippage %
+            orderValue > BigDecimal("50000") -> slippagePercentDecimal * BigDecimal("1.5")    // >$50K: 1.5x slippage %
+            orderValue > BigDecimal("10000") -> slippagePercentDecimal * BigDecimal("1.25")   // >$10K: 1.25x slippage %
+            else -> slippagePercentDecimal                                                    // Small orders: normal slippage %
+        }
+
+        val slippageCost = orderValue * (adjustedSlippagePercent safeDiv BigDecimal("100"))
+
+        Timber.d("Slippage calculation: orderValue=${orderValue.toPlainString()}, " +
+                "baseSlippage=${slippagePercentDecimal.toPlainString()}%, " +
+                "adjusted=${adjustedSlippagePercent.toPlainString()}%, " +
+                "cost=${slippageCost.toPlainString()}")
+
+        return slippageCost
+    }
 }
 
 /**
@@ -168,8 +309,9 @@ enum class OrderExecutionType {
 }
 
 /**
- * Detailed breakdown of trade costs
+ * Detailed breakdown of trade costs (DEPRECATED - Use TradeCostDecimal)
  */
+@Deprecated("Use TradeCostDecimal for exact calculations", ReplaceWith("TradeCostDecimal"))
 data class TradeCost(
     val feeAmount: Double,
     val feePercent: Double,
@@ -179,4 +321,21 @@ data class TradeCost(
     val spreadPercent: Double,
     val totalCost: Double,
     val totalCostPercent: Double
+)
+
+/**
+ * Detailed breakdown of trade costs using exact BigDecimal arithmetic
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * All monetary fields use BigDecimal for exact calculations
+ */
+data class TradeCostDecimal(
+    val feeAmount: BigDecimal,
+    val feePercent: BigDecimal,
+    val slippageAmount: BigDecimal,
+    val slippagePercent: BigDecimal,
+    val spreadCost: BigDecimal,
+    val spreadPercent: BigDecimal,
+    val totalCost: BigDecimal,
+    val totalCostPercent: BigDecimal
 )

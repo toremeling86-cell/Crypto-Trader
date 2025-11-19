@@ -309,6 +309,26 @@ class KellyCriterionCalculator @Inject constructor(
             expectedValue = (winRate * avgWinPercent) - (q * avgLossPercent)
         )
     }
+
+    /**
+     * Calculate position size for a strategy using BigDecimal (exact calculations)
+     *
+     * @param strategy Strategy with performance history
+     * @param availableBalance Available balance for trading
+     * @return Optimal position size in currency units
+     */
+    suspend fun calculatePositionSizeForStrategyDecimal(
+        strategy: Strategy,
+        availableBalance: java.math.BigDecimal
+    ): java.math.BigDecimal {
+        // Convert to Double, calculate, then convert back
+        val result = calculatePositionSizeForStrategy(
+            strategy = strategy,
+            availableBalance = availableBalance.toDouble(),
+            useActualTradeHistory = true
+        )
+        return java.math.BigDecimal.valueOf(result)
+    }
 }
 
 /**

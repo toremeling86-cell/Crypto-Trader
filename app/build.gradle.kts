@@ -190,6 +190,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.8")
     testImplementation("org.mockito:mockito-core:5.7.0") // For BacktestEventLoggerTest
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0") // Kotlin-friendly Mockito API
     testImplementation("org.mockito:mockito-inline:5.2.0") // For mocking Android Context
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.20")

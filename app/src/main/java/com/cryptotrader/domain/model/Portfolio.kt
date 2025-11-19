@@ -1,38 +1,113 @@
 package com.cryptotrader.domain.model
 
+import com.cryptotrader.utils.toBigDecimalMoney
+import java.math.BigDecimal
+
 /**
  * Portfolio state with balance and performance metrics
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * - All monetary fields now use BigDecimal for exact calculations
+ * - Double fields deprecated but kept for backward compatibility
+ * - New code should use *Decimal fields exclusively
  */
 data class Portfolio(
+    // Total value - exact decimal arithmetic
+    @Deprecated("Use totalValueDecimal for exact calculations", ReplaceWith("totalValueDecimal"))
     val totalValue: Double,
+    val totalValueDecimal: BigDecimal = totalValue.toBigDecimalMoney(),
+
+    // Available balance - exact decimal arithmetic
+    @Deprecated("Use availableBalanceDecimal for exact calculations", ReplaceWith("availableBalanceDecimal"))
     val availableBalance: Double,
+    val availableBalanceDecimal: BigDecimal = availableBalance.toBigDecimalMoney(),
+
     val balances: Map<String, AssetBalance>,
+
+    // Profit - exact decimal arithmetic
+    @Deprecated("Use totalProfitDecimal for exact calculations", ReplaceWith("totalProfitDecimal"))
     val totalProfit: Double,
+    val totalProfitDecimal: BigDecimal = totalProfit.toBigDecimalMoney(),
+
+    @Deprecated("Use totalProfitPercentDecimal for exact calculations", ReplaceWith("totalProfitPercentDecimal"))
     val totalProfitPercent: Double,
+    val totalProfitPercentDecimal: BigDecimal = totalProfitPercent.toBigDecimalMoney(),
+
+    @Deprecated("Use dayProfitDecimal for exact calculations", ReplaceWith("dayProfitDecimal"))
     val dayProfit: Double,
+    val dayProfitDecimal: BigDecimal = dayProfit.toBigDecimalMoney(),
+
+    @Deprecated("Use dayProfitPercentDecimal for exact calculations", ReplaceWith("dayProfitPercentDecimal"))
     val dayProfitPercent: Double,
+    val dayProfitPercentDecimal: BigDecimal = dayProfitPercent.toBigDecimalMoney(),
+
     val openPositions: Int,
     val timestamp: Long = System.currentTimeMillis(),
-    // EUR values (calculated from USD values using EUR/USD rate)
+
+    // EUR values (calculated from USD values using EUR/USD rate) - exact decimal arithmetic
+    @Deprecated("Use totalValueEURDecimal for exact calculations", ReplaceWith("totalValueEURDecimal"))
     val totalValueEUR: Double = 0.0,
+    val totalValueEURDecimal: BigDecimal = totalValueEUR.toBigDecimalMoney(),
+
+    @Deprecated("Use availableBalanceEURDecimal for exact calculations", ReplaceWith("availableBalanceEURDecimal"))
     val availableBalanceEUR: Double = 0.0,
+    val availableBalanceEURDecimal: BigDecimal = availableBalanceEUR.toBigDecimalMoney(),
+
+    @Deprecated("Use totalProfitEURDecimal for exact calculations", ReplaceWith("totalProfitEURDecimal"))
     val totalProfitEUR: Double = 0.0,
+    val totalProfitEURDecimal: BigDecimal = totalProfitEUR.toBigDecimalMoney(),
+
+    @Deprecated("Use dayProfitEURDecimal for exact calculations", ReplaceWith("dayProfitEURDecimal"))
     val dayProfitEUR: Double = 0.0,
+    val dayProfitEURDecimal: BigDecimal = dayProfitEUR.toBigDecimalMoney(),
+
+    @Deprecated("Use eurUsdRateDecimal for exact calculations", ReplaceWith("eurUsdRateDecimal"))
     val eurUsdRate: Double = 1.08, // Current EUR/USD exchange rate used for conversion
-    // NOK values (calculated from USD values using USD/NOK rate)
+    val eurUsdRateDecimal: BigDecimal = eurUsdRate.toBigDecimalMoney(),
+
+    // NOK values (calculated from USD values using USD/NOK rate) - exact decimal arithmetic
+    @Deprecated("Use totalValueNOKDecimal for exact calculations", ReplaceWith("totalValueNOKDecimal"))
     val totalValueNOK: Double = 0.0,
+    val totalValueNOKDecimal: BigDecimal = totalValueNOK.toBigDecimalMoney(),
+
+    @Deprecated("Use availableBalanceNOKDecimal for exact calculations", ReplaceWith("availableBalanceNOKDecimal"))
     val availableBalanceNOK: Double = 0.0,
+    val availableBalanceNOKDecimal: BigDecimal = availableBalanceNOK.toBigDecimalMoney(),
+
+    @Deprecated("Use totalProfitNOKDecimal for exact calculations", ReplaceWith("totalProfitNOKDecimal"))
     val totalProfitNOK: Double = 0.0,
+    val totalProfitNOKDecimal: BigDecimal = totalProfitNOK.toBigDecimalMoney(),
+
+    @Deprecated("Use dayProfitNOKDecimal for exact calculations", ReplaceWith("dayProfitNOKDecimal"))
     val dayProfitNOK: Double = 0.0,
-    val usdNokRate: Double = 10.50 // Current USD/NOK exchange rate used for conversion
+    val dayProfitNOKDecimal: BigDecimal = dayProfitNOK.toBigDecimalMoney(),
+
+    @Deprecated("Use usdNokRateDecimal for exact calculations", ReplaceWith("usdNokRateDecimal"))
+    val usdNokRate: Double = 10.50, // Current USD/NOK exchange rate used for conversion
+    val usdNokRateDecimal: BigDecimal = usdNokRate.toBigDecimalMoney()
 )
 
+/**
+ * Asset balance with BigDecimal support
+ */
 data class AssetBalance(
     val asset: String,
+
+    @Deprecated("Use balanceDecimal for exact calculations", ReplaceWith("balanceDecimal"))
     val balance: Double,
+    val balanceDecimal: BigDecimal = balance.toBigDecimalMoney(),
+
+    @Deprecated("Use valueInUSDDecimal for exact calculations", ReplaceWith("valueInUSDDecimal"))
     val valueInUSD: Double,
+    val valueInUSDDecimal: BigDecimal = valueInUSD.toBigDecimalMoney(),
+
+    @Deprecated("Use percentOfPortfolioDecimal for exact calculations", ReplaceWith("percentOfPortfolioDecimal"))
     val percentOfPortfolio: Double,
-    val valueInEUR: Double = 0.0 // Value in EUR (calculated from USD value)
+    val percentOfPortfolioDecimal: BigDecimal = percentOfPortfolio.toBigDecimalMoney(),
+
+    @Deprecated("Use valueInEURDecimal for exact calculations", ReplaceWith("valueInEURDecimal"))
+    val valueInEUR: Double = 0.0, // Value in EUR (calculated from USD value)
+    val valueInEURDecimal: BigDecimal = valueInEUR.toBigDecimalMoney()
 )
 
 /**
@@ -68,17 +143,42 @@ data class OrderBook(
 
 /**
  * Portfolio holding - individual asset in portfolio
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * All monetary fields use BigDecimal for exact calculations
  */
 data class PortfolioHolding(
     val asset: String,
     val assetName: String,
+
+    @Deprecated("Use amountDecimal for exact calculations", ReplaceWith("amountDecimal"))
     val amount: Double,
+    val amountDecimal: BigDecimal = amount.toBigDecimalMoney(),
+
+    @Deprecated("Use currentPriceDecimal for exact calculations", ReplaceWith("currentPriceDecimal"))
     val currentPrice: Double,
+    val currentPriceDecimal: BigDecimal = currentPrice.toBigDecimalMoney(),
+
+    @Deprecated("Use currentValueDecimal for exact calculations", ReplaceWith("currentValueDecimal"))
     val currentValue: Double,
+    val currentValueDecimal: BigDecimal = currentValue.toBigDecimalMoney(),
+
+    @Deprecated("Use percentOfPortfolioDecimal for exact calculations", ReplaceWith("percentOfPortfolioDecimal"))
     val percentOfPortfolio: Double,
+    val percentOfPortfolioDecimal: BigDecimal = percentOfPortfolio.toBigDecimalMoney(),
+
+    @Deprecated("Use costBasisDecimal for exact calculations", ReplaceWith("costBasisDecimal"))
     val costBasis: Double = 0.0,
+    val costBasisDecimal: BigDecimal = costBasis.toBigDecimalMoney(),
+
+    @Deprecated("Use unrealizedPnLDecimal for exact calculations", ReplaceWith("unrealizedPnLDecimal"))
     val unrealizedPnL: Double = 0.0,
+    val unrealizedPnLDecimal: BigDecimal = unrealizedPnL.toBigDecimalMoney(),
+
+    @Deprecated("Use unrealizedPnLPercentDecimal for exact calculations", ReplaceWith("unrealizedPnLPercentDecimal"))
     val unrealizedPnLPercent: Double = 0.0,
+    val unrealizedPnLPercentDecimal: BigDecimal = unrealizedPnLPercent.toBigDecimalMoney(),
+
     val assetType: AssetType = AssetType.CRYPTO
 )
 
@@ -91,12 +191,25 @@ enum class AssetType {
 
 /**
  * Portfolio snapshot for historical tracking
+ *
+ * BigDecimal Migration (Phase 2.9):
+ * All monetary fields use BigDecimal for exact calculations
  */
 data class PortfolioSnapshot(
     val timestamp: Long,
+
+    @Deprecated("Use totalValueDecimal for exact calculations", ReplaceWith("totalValueDecimal"))
     val totalValue: Double,
+    val totalValueDecimal: BigDecimal = totalValue.toBigDecimalMoney(),
+
+    @Deprecated("Use totalPnLDecimal for exact calculations", ReplaceWith("totalPnLDecimal"))
     val totalPnL: Double,
+    val totalPnLDecimal: BigDecimal = totalPnL.toBigDecimalMoney(),
+
+    @Deprecated("Use totalPnLPercentDecimal for exact calculations", ReplaceWith("totalPnLPercentDecimal"))
     val totalPnLPercent: Double,
+    val totalPnLPercentDecimal: BigDecimal = totalPnLPercent.toBigDecimalMoney(),
+
     val holdings: List<PortfolioHolding>
 )
 

@@ -37,6 +37,7 @@ object NetworkModule {
     @Singleton
     fun provideMoshi(): Moshi {
         return Moshi.Builder()
+            .add(com.cryptotrader.utils.BigDecimalAdapter())  // BigDecimal support
             .add(KotlinJsonAdapterFactory())
             .build()
     }
