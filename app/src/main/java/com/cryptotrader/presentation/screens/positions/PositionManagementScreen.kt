@@ -134,36 +134,42 @@ fun PositionManagementScreen(
             }
 
             // Positions List
-            if (positions.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No positions found",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            when {
+                state.isLoading && positions.isEmpty() -> {
+                    // Show loading skeletons on initial load
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(5) { // Show 5 skeleton cards
+                            com.cryptotrader.presentation.components.PositionCardSkeleton()
+                        }
+                    }
                 }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(positions) { position ->
-                        PositionCard(
-                            position = position,
-                            onClose = { 
-                                // Calculate approximate current price for closing
-                                // In a real scenario, the backend/repo handles the market order price
-                                val currentPrice = if (position.side == PositionSide.LONG) {
-                                    position.entryPrice + (position.unrealizedPnL / position.quantity)
-                                } else {
-                                    position.entryPrice - (position.unrealizedPnL / position.quantity)
+                positions.isEmpty() -> {
+                    // Show professional empty state
+                    com.cryptotrader.presentation.components.EmptyPositions()
+                }
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(positions) { position ->
+                            PositionCard(
+                                position = position,
+                                onClose = { 
+                                    // Calculate approximate current price for closing
+                                    // In a real scenario, the backend/repo handles the market order price
+                                    val currentPrice = if (position.side == PositionSide.LONG) {
+                                        position.entryPrice + (position.unrealizedPnL / position.quantity)
+                                    } else {
+                                        position.entryPrice - (position.unrealizedPnL / position.quantity)
+                                    }
+                                    viewModel.closePosition(position.id, currentPrice) 
                                 }
-                                viewModel.closePosition(position.id, currentPrice) 
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }

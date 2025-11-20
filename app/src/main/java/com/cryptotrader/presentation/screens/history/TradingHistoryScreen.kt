@@ -73,33 +73,34 @@ fun TradingHistoryScreen(
             )
 
             // Timeline
-            if (trades.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.History,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No trades found",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            when {
+                state.isLoading && trades.isEmpty() -> {
+                    // Show loading skeletons
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(8) {
+                            com.cryptotrader.presentation.components.TradeCardSkeleton()
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(trades) { trade ->
-                        TradeTimelineCard(trade = trade)
+                trades.isEmpty() && searchQuery.isNotEmpty() -> {
+                    // Show empty search results
+                    com.cryptotrader.presentation.components.EmptySearchResults(searchQuery)
+                }
+                trades.isEmpty() -> {
+                    // Show professional empty state
+                    com.cryptotrader.presentation.components.EmptyTrades()
+                }
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(trades) { trade ->
+                            TradeTimelineCard(trade = trade)
+                        }
                     }
                 }
             }

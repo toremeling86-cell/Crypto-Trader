@@ -125,27 +125,33 @@ fun OrderManagementScreen(
             }
 
             // Order List
-            if (orders.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No orders found",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            when {
+                state.isLoading && orders.isEmpty() -> {
+                    // Show loading skeletons on initial load
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(5) {
+                            com.cryptotrader.presentation.components.OrderCardSkeleton()
+                        }
+                    }
                 }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(orders) { order ->
-                        OrderCard(
-                            order = order,
-                            onCancel = { viewModel.cancelOrder(order.id) }
-                        )
+                orders.isEmpty() -> {
+                    // Show professional empty state
+                    com.cryptotrader.presentation.components.EmptyOrders()
+                }
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(orders) { order ->
+                            OrderCard(
+                                order = order,
+                                onCancel = { viewModel.cancelOrder(order.id) }
+                            )
+                        }
                     }
                 }
             }
