@@ -104,7 +104,7 @@ private fun EmptyStateBase(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = title,
                 modifier = Modifier.size(64.dp),
                 tint = iconTint.copy(alpha = 0.6f)
             )

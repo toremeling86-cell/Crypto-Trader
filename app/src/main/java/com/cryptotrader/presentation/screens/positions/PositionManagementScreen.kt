@@ -82,7 +82,7 @@ fun PositionManagementScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Search pair (e.g. XBTUSD)") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    leadingIcon = { Icon(Icons.Default.Search, "Search") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -95,7 +95,7 @@ fun PositionManagementScreen(
                         onClick = { viewModel.setFilter(PositionFilter.OPEN) },
                         label = { Text("Open") },
                         leadingIcon = if (currentFilter == PositionFilter.OPEN) {
-                            { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
+                            { Icon(Icons.Default.Check, "Selected", modifier = Modifier.size(16.dp)) }
                         } else null
                     )
                     FilterChip(
