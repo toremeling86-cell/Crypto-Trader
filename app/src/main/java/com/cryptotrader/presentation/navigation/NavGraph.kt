@@ -36,6 +36,7 @@ sealed class Screen(val route: String) {
     object Market : Screen("market")
     object AI : Screen("ai")
     object Portfolio : Screen("portfolio")
+    object Strategy : Screen("strategy") // NEW: Strategy hub with 6 tabs
     object Reports : Screen("reports")
     object Orders : Screen("orders")
     object Positions : Screen("positions")

@@ -1,262 +1,147 @@
-# CryptoTrader - AI-Powered Cryptocurrency Trading Platform
+# CryptoTrader - Algorithmic Trading Platform
 
-[![Android CI](https://github.com/toremeling86-cell/Crypto-Trader/actions/workflows/build-test.yml/badge.svg)](https://github.com/toremeling86-cell/Crypto-Trader/actions/workflows/build-test.yml)
-[![DB Version](https://img.shields.io/badge/Database-v19-blue)](./MIGRATIONS.md)
-[![Review Ready](https://img.shields.io/badge/Review-9/9%20(100%25)-brightgreen)](./REVIEW_READY_CHECKLIST.md)
-[![Secrets Scan](https://img.shields.io/badge/Secrets-Gitleaks%20✓-green)](./.gitleaks.toml)
+> ⚠️ **IMPORTANT DISCLAIMER**: This software is provided for **educational and research purposes only**. Cryptocurrency trading involves substantial risk of loss. Use this software at your own risk. The developers assume no responsibility for any financial losses incurred.
 
-**CryptoTrader** er en profesjonell Android-applikasjon for automatisert kryptovalutahandel med Kraken API-integrasjon og AI-drevet strategigenerering.
+## 📱 Overview
 
-**Status:** ✅ Review-Ready | 🚀 Active Development | 📊 DB v19
+CryptoTrader is a professional-grade Android application for algorithmic cryptocurrency trading, featuring AI-powered strategy generation, comprehensive backtesting, and multiple exchange integrations.
 
-## 🚀 Funksjoner
+### Key Features
 
-### ✅ Implementerte Funksjoner
-- **Kraken API-integrasjon**: Full REST API og WebSocket-støtte
-- **Sikker credential-håndtering**: Kryptert lagring av API-nøkler med Android Keystore
-- **AI Strategy Generator**: Claude AI-drevet generering av handelsstrategier
-- **Real-time markedsdata**: WebSocket-basert live prisoppdateringer
-- **Automatisk trading**: WorkManager for bakgrunnshandel
-- **Risk Management**: Innebygd risikostyring og posisjonshåndtering
-- **Clean Architecture**: MVVM + Repository pattern med Hilt DI
-- **Jetpack Compose UI**: Moderne deklarativ UI
-- **Room Database**: Lokal persistens for trades og strategier
+- 🤖 **AI Strategy Generation**: Natural language strategy creation powered by Claude AI
+- 📊 **Advanced Backtesting**: Hedge-fund quality backtesting engine with BigDecimal precision
+- 📈 **Multi-Exchange Support**: Kraken and Binance integration
+- 🧠 **Strategy Automation**: Automated trading with customizable entry/exit conditions
+- 📉 **Performance Analytics**: Real-time portfolio tracking, P&L analysis, Sharpe ratio, drawdown metrics
+- 🔐 **Secure by Default**: Encrypted credential storage, paper trading mode enabled by default
+- 🎨 **Material 3 UI**: Modern, professional interface following Material Design guidelines
 
-### 📱 Skjermer
-1. **API Setup**: Sett opp Kraken API-nøkler
-2. **Dashboard**: Oversikt over portfolio, aktive strategier og siste trades
-3. **Strategy Config**: Opprett og administrer handelsstrategier
+## 🛠 Tech Stack
 
-## 🏗️ Arkitektur
-
-```
-Presentation Layer (Jetpack Compose)
-    ↓
-ViewModel Layer (State Management)
-    ↓
-Domain Layer (Business Logic)
-    ↓
-Repository Layer (Data Abstraction)
-    ↓
-Data Sources (Room DB, Kraken API, Claude API)
-```
-
-## 🛠️ Tech Stack
-
-- **Language**: Kotlin 1.9.20
-- **UI**: Jetpack Compose + Material Design 3
+- **Language**: Kotlin
+- **UI**: Jetpack Compose
+- **Architecture**: Clean Architecture (MVVM + Repository)
 - **Dependency Injection**: Hilt
 - **Database**: Room
 - **Networking**: Retrofit + OkHttp
-- **JSON**: Moshi + Kotlin Serialization
-- **Async**: Kotlin Coroutines + Flow
-- **Background Tasks**: WorkManager
-- **Security**: Encrypted SharedPreferences
-- **Logging**: Timber
+- **Testing**: JUnit, Mockito, ComposeTest
 
-## 📦 Build & Test
-
-### Quick Start
-
-```bash
-# Clone repository
-git clone https://github.com/toremeling86-cell/Crypto-Trader.git
-cd Crypto-Trader
-
-# Setup environment
-cp .env.example .env
-# Edit .env with your API keys
-
-# Build & test
-./gradlew clean :app:testDebugUnitTest
-./gradlew :app:assembleDebug
-
-# Install on device
-./gradlew :app:installDebug
-```
-
-**📘 For detailed instructions, see:** [BUILD_RUN.md](./BUILD_RUN.md)
+## 🚀 Getting Started
 
 ### Prerequisites
-- Android Studio Hedgehog or newer
-- JDK 17
-- Android SDK 34
-- Gradle 8.2+
-- Kraken API keys ([Get here](https://www.kraken.com/features/api))
-- Claude API key (optional)
 
-### CI/CD Pipeline
+- Android Studio Hedgehog (2023.1.1) or newer
+- JDK 17+
+- Android SDK 34+
+- Minimum Android device: API 29 (Android 10)
 
-All pushes to `main` automatically trigger:
-- ✅ **Secrets scanning** (Gitleaks - prevents credential leaks)
-- ✅ **Code style checks** (ktlint, detekt)
-- ✅ **Unit tests** (`testDebugUnitTest`)
-- ✅ **Smoke tests** (backtest pipeline validation)
-- ✅ **APK build verification**
+### Installation
 
-**View CI Status:** [GitHub Actions](https://github.com/toremeling86-cell/Crypto-Trader/actions)
-
-### Kraken API Setup
-
-1. Gå til [Kraken API Settings](https://www.kraken.com/u/security/api)
-2. Opprett en ny API-nøkkel med følgende tillatelser:
-   - Query Funds
-   - Query Open Orders & Trades
-   - Query Closed Orders & Trades
-   - Create & Modify Orders
-3. Kopier Public Key og Private Key
-4. Lim inn i appen ved første oppstart
-
-## 🔒 Sikkerhet
-
-- **API-nøkler**: Lagret kryptert med Android Keystore
-- **Nettverkstrafikk**: TLS 1.2+ med certificate pinning
-- **Autentisering**: HMAC-SHA512 signing for Kraken API
-- **ProGuard**: Obfuskering av kode i release builds
-
-## 🧪 Testing
-
-### Unit Tests
+1. Clone the repository:
 ```bash
-./gradlew :app:testDebugUnitTest
+git clone https://github.com/toremeling86-cell/Crypto-Trader.git
+cd Crypto-Trader
 ```
 
-### Smoke Tests
-```bash
-# Runs BacktestSmokeTest - MUST produce >0 trades
-./gradlew :app:test --tests "*.BacktestSmokeTest"
-```
+2. Open the project in Android Studio
 
-**Critical:** Smoke tests validate:
-- Backtest pipeline functionality
-- Sharpe ratio calculation accuracy
-- Look-ahead bias prevention
-- Sample data integrity
+3. Sync Gradle dependencies
 
-### UI Tests
-```bash
-./gradlew connectedAndroidTest
-```
+4. Run the app on an emulator or physical device
 
-**Test Coverage:** See `app/src/test/` and `app/src/androidTest/`
+### Configuration
 
-## 📊 Database Schema
+#### API Keys (Required for Live Trading)
 
-**Current Version:** v19 (Meta-Analysis Integration)
+1. **Claude AI** (for AI strategy generation):
+   - Get your API key from [Anthropic Console](https://console.anthropic.com/)
+   - Navigate to Settings → AI Configuration in the app
+   - Enter your `sk-ant-...` key
 
-### Key Tables
-- **strategies**: Trading strategies with performance tracking
-- **trades**: Trade execution history
-- **backtest_runs**: Backtest results with data provenance (v17+)
-- **meta_analyses**: AI-generated strategy analysis (v11+)
-- **knowledge_base**: Cross-strategy learning insights (v19+)
-- **expert_reports**: Market analysis reports for meta-analysis
+2. **Kraken** (exchange integration):
+   - Create API key at [Kraken API Settings](https://www.kraken.com/u/security/api)
+   - Permissions needed: Query Funds, Query Open Orders, Create & Modify Orders
+   - Enter in Settings → API Keys
 
-### Documentation
-- **Migration History:** [MIGRATIONS.md](./MIGRATIONS.md) - Complete migration changelog (v1→v19)
-- **Migration Policy:** [DB_MIGRATION_POLICY.md](./DB_MIGRATION_POLICY.md) - Database change procedures (TODO 8)
-- **Phase 3 E2E:** [docs/PHASE3_E2E_GUIDE.md](./docs/PHASE3_E2E_GUIDE.md) - Meta-analysis testing guide
+3. **Binance** (exchange integration):
+   - Create API key at [Binance API Management](https://www.binance.com/en/my/settings/api-management)
+   - Enable Spot Trading permissions
+   - Enter in Settings → API Keys
 
-## 🔧 Konfigurasjon
-
-### Build Variants
-- **debug**: Development build med logging
-- **release**: Produksjon med ProGuard og optimalisering
-
-### Gradle Properties
-```properties
-org.gradle.jvmargs=-Xmx2048m
-android.useAndroidX=true
-kotlin.code.style=official
-```
-
-## 📝 Kodestruktur
-
-```
-app/src/main/java/com/cryptotrader/
-├── di/                      # Dependency Injection
-├── data/
-│   ├── local/              # Room database
-│   ├── remote/             # API clients
-│   └── repository/         # Repository implementations
-├── domain/
-│   ├── model/              # Domain models
-│   ├── trading/            # Trading engine & risk manager
-│   └── usecase/            # Business logic use cases
-├── presentation/
-│   ├── screens/            # Compose UI screens
-│   ├── navigation/         # Navigation graph
-│   └── theme/              # Material theme
-├── workers/                # Background WorkManager
-└── utils/                  # Utilities & extensions
-```
-
-## ⚠️ Disclaimer
-
-**VIKTIG**: Denne appen er kun for utdanningsformål. Kryptovalutahandel medfører betydelig risiko.
-
-- Ikke invester mer enn du har råd til å tape
-- Test alltid med små beløp først
-- Tidligere resultater garanterer ikke fremtidige resultater
-- Utviklerne tar ikke ansvar for økonomiske tap
-
-## 📜 Lisens
-
-Dette prosjektet er proprietært. All kopiering, distribusjon eller bruk krever eksplisitt tillatelse.
-
-## 🤝 Bidrag
-
-Dette er et privat prosjekt. Kontakt eieren for bidragsmuligheter.
-
-## 📞 Support
-
-For spørsmål eller problemer, åpne et issue i GitHub repository.
+**Security Note**: All API keys are stored encrypted using Android's EncryptedSharedPreferences.
 
 ## 📚 Documentation
 
-- **[BUILD_RUN.md](./BUILD_RUN.md)** - Build instructions, smoke tests, artifact locations
-- **[MIGRATIONS.md](./MIGRATIONS.md)** - Database migration history (v1→v16)
-- **[REVIEW_READY_CHECKLIST.md](./REVIEW_READY_CHECKLIST.md)** - Expert review checklist (7/9 complete)
-- **[PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)** - Architecture and system design
-- **[HEDGE_FUND_QUALITY_FIXES.md](./HEDGE_FUND_QUALITY_FIXES.md)** - Production-ready improvements
+- **[UI Changelog](UI_CHANGELOG.md)**: Detailed UI changes and team coordination
+- **[Screen Routes](SCREEN_ROUTES.md)**: Navigation structure and deep linking
+- **[Navigation Proposal](NAVIGATION_STRUCTURE_PROPOSAL.md)**: Planned 5-tab structure (future)
 
-## 🔄 Recent Improvements (November 2024)
+## 🏗 Project Structure
 
-### ✅ P0-1: Strategy Soft-Delete (DB v15→v16)
-- Strategies with hardcoded prices are now **preserved** instead of deleted
-- Enables debugging and strategy history analysis
-- Migration: [DatabaseMigrations.kt#L847-L861](app/src/main/java/com/cryptotrader/data/local/migrations/DatabaseMigrations.kt)
+```
+app/src/main/java/com/cryptotrader/
+├── data/               # Data layer (repositories, DAOs, entities)
+├── domain/             # Business logic (models, use cases, backtesting)
+├── presentation/       # UI layer (screens, ViewModels, components)
+│   ├── screens/       # Feature screens
+│   ├── components/    # Reusable UI components
+│   └── theme/         # Material 3 theming
+├── di/                # Dependency injection modules
+├── utils/             # Utilities (crypto, logging, extensions)
+└── workers/           # Background workers (trading, AI analysis)
+```
 
-### ✅ P1-3: Sharpe Ratio Annualization Fix
-- **Fixed:** Hardcoded 252 trading days (incorrect for crypto 24/7 markets)
-- **Now:** Timeframe-aware calculation (1m: 525,960, 1h: 8,766, 1d: 365.25 periods/year)
-- Crypto markets trade 24/7, not just stock market hours!
+## 📊 Features Breakdown
 
-### ✅ Cloud Storage System (Cloudflare R2)
-- Smart quarter-based historical data download
-- Parquet file support with Zstandard compression
-- Data tier quality levels (PREMIUM/PROFESSIONAL/STANDARD/BASIC)
+### Backtesting Engine
+- High-precision calculations using `BigDecimal`
+- Candlestick-based simulation
+- Slippage modeling
+- Commission/fee calculations
+- Performance metrics: Sharpe ratio, Max Drawdown, Profit Factor
 
-## 🎯 Roadmap
+### Strategy Builder
+- Visual condition builder
+- Support for technical indicators (RSI, MACD, Bollinger Bands, SMA, EMA)
+- Risk management (Stop Loss, Take Profit, Position Sizing)
+- AI-assisted strategy generation via natural language
 
-**FASE 1 (In Progress):**
-- [x] P0-1: Soft-delete strategies
-- [x] P1-3: Sharpe ratio crypto annualization
-- [ ] P1-4: Data provenance tracking
-- [ ] P1-5: Parameterized cost model
+### Portfolio Management
+- Real-time position tracking
+- Order management (Market, Limit, Stop-Loss orders)
+- Trade history with advanced filtering
+- Performance analytics dashboard
 
-**FASE 2 (Planned):**
-- [ ] P1-6: Look-ahead bias invariance tests
-- [ ] P1-7: NDJSON observability logging
+## ⚠️ Risk Warnings
 
-**FASE 3 (Planned):**
-- [ ] P0-2: Re-activate MetaAnalysisAgent
-- [ ] Multi-exchange support (Binance, Coinbase)
-- [ ] Advanced charting with technical indicators
+- **Cryptocurrency trading is highly speculative and involves substantial risk.**
+- **Past performance does not guarantee future results.**
+- **Never invest more than you can afford to lose.**
+- **Backtesting results are simulations and may not reflect actual trading performance.**
+- **The developers are not financial advisors. Do your own research.**
+
+## 🔐 Security Best Practices
+
+1. **Never share your API keys** with anyone
+2. **Use Paper Trading mode** to test strategies before going live
+3. **Set appropriate risk limits** in Settings
+4. **Enable biometric lock** for added security
+5. **Regularly review** your active strategies and positions
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## 📧 Contact
+
+For questions or feedback, please open an issue on GitHub.
 
 ---
 
-**Branch:** `main`
-**Database Version:** v16
-**Last Updated:** November 18, 2024
-**Status:** 🟢 100% Review-Ready (9/9 items complete) 🎉
+**Built with ❤️ for the crypto trading community**
+
+**Remember**: This is an educational project. Always practice responsible trading and risk management.
