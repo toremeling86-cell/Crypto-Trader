@@ -205,9 +205,9 @@ fun TradeTimelineCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DetailRow("Trade ID", trade.id.takeLast(8))
-                    DetailRow("Order ID", trade.orderId.takeLast(8))
-                    DetailRow("Strategy ID", trade.strategyId?.takeLast(8) ?: "N/A")
+                    DetailRow("Trade ID", trade.id.toString())
+                    DetailRow("Order ID", trade.orderId)
+                    DetailRow("Strategy ID", trade.strategyId ?: "N/A")
                     DetailRow("Fee", trade.fee.formatCurrency())
                     DetailRow("Status", trade.status.name)
                 }

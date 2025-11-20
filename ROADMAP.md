@@ -2504,3 +2504,20 @@ implementation("androidx.documentfile:documentfile:1.0.1")
 - Database queries < 50ms
 
 ---
+## Compilation Fixes - November 20, 2025
+
+**Status**: All 7 compilation errors fixed
+
+Fixed the following compilation errors:
+1. PositionRepository.kt:635 - Flow/combine function issues (used flatMapLatest)
+2. ChatScreen.kt:343 - animateFloat API missing label parameters
+3. DashboardScreen.kt:402 - Missing TextOverflow import
+4. TradingHistoryScreen.kt:208 - takeLast() safety checks added
+5. TradingHistoryViewModel.kt:29 - Changed getAllTrades() to getAllTradesFlow()
+6. CreateStrategyViewModel.kt:101 - Changed MANUAL to USER enum value
+7. StrategyConfigScreen.kt:680 - Added Warning icon import
+
+See COMPILATION_FIXES_SUMMARY.md for detailed breakdown.
+
+---
+

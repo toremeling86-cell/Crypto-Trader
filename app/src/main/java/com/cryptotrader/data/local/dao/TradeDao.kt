@@ -4,6 +4,11 @@ import androidx.room.*
 import com.cryptotrader.data.local.entities.TradeEntity
 import kotlinx.coroutines.flow.Flow
 
+data class StrategyTradeCount(
+    val strategyId: String,
+    val count: Int
+)
+
 @Dao
 interface TradeDao {
     @Query("SELECT * FROM trades ORDER BY timestamp DESC LIMIT :limit")
@@ -88,7 +93,6 @@ interface TradeDao {
 
     @Query("DELETE FROM trades WHERE executedAt < :before")
     suspend fun deleteTradesBefore(before: Long): Int
-}
 
     // Advanced query methods for analytics
     /**
@@ -124,7 +128,7 @@ interface TradeDao {
         WHERE strategyId IS NOT NULL
         GROUP BY strategyId
     """)
-    suspend fun getTradeCountByStrategy(): Map<String, Int>
+    suspend fun getTradeCountByStrategy(): List<StrategyTradeCount>
 
     /**
      * Get all distinct trading pairs

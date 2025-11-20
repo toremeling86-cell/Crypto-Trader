@@ -78,7 +78,7 @@ fun PerformanceScreen(
                     ) {
                         MetricCard(
                             title = "Total P&L",
-                            value = state.performanceMetrics?.totalPnL?.let { it.formatCurrency() } ?: "$0.00",
+                            value = state.performanceMetrics?.totalPnL?.toDouble()?.formatCurrency() ?: "$0.00",
                             subtitle = "${state.totalTrades} trades",
                             isPositive = state.performanceMetrics?.totalPnL?.let { it >= BigDecimal.ZERO } ?: false,
                             modifier = Modifier.weight(1f)
@@ -351,7 +351,7 @@ fun StrategyPerformanceCard(
                 Column {
                     Text("P&L", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        performance.totalPnL.formatCurrency(),
+                        performance.totalPnL.toDouble().formatCurrency(),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = if (performance.totalPnL >= BigDecimal.ZERO) Color(0xFF4CAF50) else Color(0xFFE57373)

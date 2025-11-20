@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -631,29 +632,29 @@ class PositionRepository @Inject constructor(
      * @param positionId ID of the position to track
      * @return Flow emitting PositionWithPrice updates
      */
-    fun getPositionWithCurrentPrice(positionId: String): Flow<PositionWithPrice> =
-        combine(
-            positionDao.getPositionById(positionId),
-            priceCache.observePrice(
-                // Need to get pair from position first
-                positionDao.getPositionById(positionId).map { it?.pair ?: "" }
-            )
-        ) { positionEntity, currentPrice ->
-            if (positionEntity == null || currentPrice == null) {
-                null
-            } else {
-                val position = positionEntity.toDomain()
-                val (pnl, pnlPercent) = position.calculateUnrealizedPnLDecimal(currentPrice)
+    fun getPositionWithCurrentPrice(positionId: String): Flow<PositionWithPrice> {
+        // Get position flow first
+        val positionFlow = positionDao.getPositionByIdFlow(positionId).filterNotNull()
 
-                PositionWithPrice(
-                    position = position,
-                    currentPrice = currentPrice,
-                    unrealizedPnL = pnl,
-                    unrealizedPnLPercent = pnlPercent.toDouble(),
-                    lastPriceUpdate = System.currentTimeMillis()
-                )
+        return positionFlow.flatMapLatest { positionEntity ->
+            priceCache.observePrice(positionEntity.pair).map { currentPrice ->
+                if (currentPrice == null) {
+                    null
+                } else {
+                    val position = positionEntity.toDomain()
+                    val (pnl, pnlPercent) = position.calculateUnrealizedPnLDecimal(currentPrice)
+
+                    PositionWithPrice(
+                        position = position,
+                        currentPrice = currentPrice,
+                        unrealizedPnL = pnl,
+                        unrealizedPnLPercent = pnlPercent.toDouble(),
+                        lastPriceUpdate = System.currentTimeMillis()
+                    )
+                }
             }
         }.filterNotNull()
+    }
 
     /**
      * Update unrealized P&L for all open positions based on current prices
@@ -682,7 +683,6 @@ class PositionRepository @Inject constructor(
                             positionId = positionEntity.id,
                             unrealizedPnLDecimal = pnl,
                             unrealizedPnLPercentDecimal = pnlPercent,
-                            currentPrice = currentPrice,
                             lastUpdated = System.currentTimeMillis()
                         )
 
@@ -820,7 +820,6 @@ class PositionRepository @Inject constructor(
                                 positionId = positionEntity.id,
                                 unrealizedPnLDecimal = pnl,
                                 unrealizedPnLPercentDecimal = pnlPercent,
-                                currentPrice = currentPrice,
                                 lastUpdated = System.currentTimeMillis()
                             )
 

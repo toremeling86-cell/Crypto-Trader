@@ -26,17 +26,17 @@ class TradingHistoryViewModel @Inject constructor(
 
     // Combined flow of trades with filters
     val trades: StateFlow<List<Trade>> = combine(
-        tradeDao.getAllTrades(),
+        tradeDao.getAllTradesFlow(),
         _filterPair,
         _filterStrategy
     ) { allTrades, pair, strategyId ->
         val domainTrades = allTrades.map { it.toDomain() }
-        
+
         domainTrades.filter { trade ->
             (pair == null || trade.pair.contains(pair, ignoreCase = true)) &&
             (strategyId == null || trade.strategyId == strategyId)
         }.sortedByDescending { it.timestamp } // Newest first
-        
+
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setFilterPair(pair: String?) {

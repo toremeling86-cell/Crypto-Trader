@@ -98,7 +98,7 @@ class CreateStrategyViewModel @Inject constructor(
                     exitConditions = emptyList(),
                     isActive = false,
                     tradingMode = TradingMode.INACTIVE,
-                    source = if (state.isAiGenerated) StrategySource.AI_CLAUDE else StrategySource.MANUAL
+                    source = if (state.isAiGenerated) StrategySource.AI_CLAUDE else StrategySource.USER
                 )
 
                 strategyRepository.insertStrategy(strategy)

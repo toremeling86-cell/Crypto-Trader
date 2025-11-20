@@ -63,7 +63,6 @@ interface PositionDao {
         positionId: String,
         unrealizedPnLDecimal: BigDecimal,
         unrealizedPnLPercentDecimal: BigDecimal,
-        currentPrice: BigDecimal,
         lastUpdated: Long
     )
 
