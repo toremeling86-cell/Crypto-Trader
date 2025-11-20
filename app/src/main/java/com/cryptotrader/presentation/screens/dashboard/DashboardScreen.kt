@@ -90,11 +90,94 @@ fun DashboardScreen(
         )
     }
 
+    // Live Mode Confirmation Dialog
+    var showLiveModeDialog by remember { mutableStateOf(false) }
+    
+    if (showLiveModeDialog) {
+        AlertDialog(
+            onDismissRequest = { showLiveModeDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text("Enable Live Trading?", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    Text(
+                        "You are about to switch to LIVE TRADING mode with REAL MONEY.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "• All trades will be executed on Kraken exchange\n" +
+                        "• Real funds will be at risk\n" +
+                        "• Ensure your strategies are tested",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.setPaperTradingMode(false)
+                        showLiveModeDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Enable Live Trading")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLiveModeDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Dashboard", fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    // Trading Mode Toggle (Batch 1.5)
+                    Switch(
+                        checked = !isPaperTrading,
+                        onCheckedChange = { isLive ->
+                            if (isLive) {
+                                showLiveModeDialog = true
+                            } else {
+                                viewModel.setPaperTradingMode(true)
+                            }
+                        },
+                        thumbContent = {
+                            if (!isPaperTrading) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.error,
+                            checkedTrackColor = MaterialTheme.colorScheme.errorContainer,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.primary,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+
                     // Trading Mode Indicator
                     TradingModeIndicator(
                         isLiveMode = !isPaperTrading,

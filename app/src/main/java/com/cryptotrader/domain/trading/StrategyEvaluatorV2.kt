@@ -15,6 +15,7 @@ import com.cryptotrader.utils.FeatureFlags
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.math.BigDecimal
 
 /**
  * Advanced strategy evaluator using calculator-based indicators
@@ -309,6 +310,14 @@ class StrategyEvaluatorV2 @Inject constructor(
      * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
      * @return True if RSI condition is met
      */
+    /**
+     * Evaluate RSI (Relative Strength Index) conditions
+     *
+     * @param condition Condition string (e.g., "RSI < 30")
+     * @param candles Historical candle data
+     * @param useCompletedOnly If true, excludes last candle to prevent look-ahead bias
+     * @return True if RSI condition is met
+     */
     private fun evaluateRSI(condition: String, candles: List<Candle>, useCompletedOnly: Boolean = false): Boolean {
         // Exclude current incomplete candle if in backtest mode
         val candlesToUse = if (useCompletedOnly && candles.size > 14) {
@@ -319,12 +328,17 @@ class StrategyEvaluatorV2 @Inject constructor(
 
         if (candlesToUse.size < 14) return false  // Need at least 14 candles for RSI
 
-        val closes = candlesToUse.map { it.close }
-        val rsiValues = rsiCalculator.calculate(closes, period = 14)
-        val rsi = rsiValues.lastOrNull() ?: return false
+        // Use BigDecimal for calculation
+        val closes = candlesToUse.map { BigDecimal(it.close.toString()).setScale(com.cryptotrader.utils.MONEY_SCALE, com.cryptotrader.utils.MONEY_ROUNDING) }
+        val rsiValues = rsiCalculator.calculateDecimal(closes, period = 14)
+        val rsiBD = rsiValues.lastOrNull() ?: return false
+        
+        // Convert back to Double for comparison with threshold (which is extracted as Double)
+        // In a full migration, we would extract threshold as BigDecimal too, but this bridges the gap
+        val rsi = rsiBD.toDouble()
 
         if (FeatureFlags.LOG_CACHE_PERFORMANCE) {
-            Timber.d("[$TAG] RSI calculated: $rsi")
+            Timber.d("[$TAG] RSI calculated (BigDecimal): $rsi")
         }
 
         return when {

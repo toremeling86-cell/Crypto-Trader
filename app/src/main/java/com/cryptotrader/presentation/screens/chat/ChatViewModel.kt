@@ -3,13 +3,12 @@ package com.cryptotrader.presentation.screens.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cryptotrader.data.repository.CryptoReportRepository
-// TEMPORARILY DISABLED - Learning section
-// import com.cryptotrader.data.repository.MetaAnalysisRepository
+import com.cryptotrader.data.repository.MetaAnalysisRepository
 import com.cryptotrader.data.repository.StrategyRepository
-// TEMPORARILY DISABLED - Learning section
-// import com.cryptotrader.domain.advisor.MetaAnalysisAgent
+import com.cryptotrader.domain.advisor.MetaAnalysisAgent
 import com.cryptotrader.domain.ai.ClaudeChatService
 import com.cryptotrader.domain.model.ChatMessage
+import com.cryptotrader.utils.toBigDecimalMoney
 import com.cryptotrader.domain.model.MetaAnalysis
 import com.cryptotrader.domain.model.Strategy
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,9 +25,8 @@ class ChatViewModel @Inject constructor(
     private val claudeChatService: ClaudeChatService,
     private val strategyRepository: StrategyRepository,
     private val cryptoReportRepository: CryptoReportRepository,
-    // TEMPORARILY DISABLED - Learning section
-    // private val metaAnalysisRepository: MetaAnalysisRepository,
-    // private val metaAnalysisAgent: MetaAnalysisAgent,
+    private val metaAnalysisRepository: MetaAnalysisRepository,
+    private val metaAnalysisAgent: MetaAnalysisAgent,
     private val backtestEngine: com.cryptotrader.domain.backtesting.BacktestEngine,
     private val marketDataRepository: com.cryptotrader.data.repository.MarketDataRepository,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle
@@ -187,12 +185,13 @@ class ChatViewModel @Inject constructor(
 
                 // Run backtest (temporarily set strategy as active for testing)
                 val testStrategy = strategy.copy(isActive = true)
-                val backtestResult = backtestEngine.runBacktest(
+                val resultDecimal = backtestEngine.runBacktestDecimal(
                     strategy = testStrategy,
                     historicalData = historicalData,
-                    startingBalance = 10000.0,
+                    startingBalance = 10000.0.toBigDecimalMoney(),
                     costModel = costModel
                 )
+                val backtestResult = resultDecimal.toBacktestResult()
 
                 Timber.i("Backtest complete: P&L ${backtestResult.totalPnL}, Win Rate: ${backtestResult.winRate}%")
 
@@ -340,8 +339,6 @@ class ChatViewModel @Inject constructor(
         Timber.d("Analysis timeframe changed to: ${timeframe.displayName}")
     }
 
-    // TEMPORARILY DISABLED - Learning section
-    /*
     /**
      * Trigger meta-analysis with rolling window approach (Phase 3B)
      */
@@ -415,7 +412,6 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    */
 
     /**
      * Dismiss analysis result dialog
@@ -427,8 +423,6 @@ class ChatViewModel @Inject constructor(
         )
     }
 
-    // TEMPORARILY DISABLED - Learning section
-    /*
     /**
      * Approve meta-analysis and create strategy
      */
@@ -488,7 +482,6 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    */
 
     private fun addMessage(message: ChatMessage) {
         val currentMessages = _uiState.value.messages.toMutableList()

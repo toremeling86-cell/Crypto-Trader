@@ -16,4 +16,13 @@ interface RsiCalculator {
      * @return List of RSI values (first 'period' values will be null due to insufficient data)
      */
     fun calculate(closes: List<Double>, period: Int = 14): List<Double?>
+
+    /**
+     * Calculates RSI values for a series of closing prices using BigDecimal for precision
+     *
+     * @param closes List of closing prices (must have at least period + 1 values)
+     * @param period The lookback period for RSI calculation (default: 14)
+     * @return List of RSI values (first 'period' values will be null due to insufficient data)
+     */
+    fun calculateDecimal(closes: List<java.math.BigDecimal>, period: Int = 14): List<java.math.BigDecimal?>
 }

@@ -93,6 +93,55 @@ class WorkScheduler @Inject constructor(
     }
 
     /**
+     * Schedule order monitoring (every 30 seconds)
+     * Monitors active orders and syncs status with Kraken
+     */
+    fun scheduleOrderMonitor(enabled: Boolean = true) {
+        if (enabled) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val workRequest = PeriodicWorkRequestBuilder<OrderMonitor>(
+                repeatInterval = 15, // Minimum allowed by WorkManager
+                repeatIntervalTimeUnit = TimeUnit.MINUTES
+            )
+                .setConstraints(constraints)
+                .addTag(OrderMonitor.TAG)
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    WorkRequest.MIN_BACKOFF_MILLIS,
+                    TimeUnit.MILLISECONDS
+                )
+                .build()
+
+            workManager.enqueueUniquePeriodicWork(
+                OrderMonitor.WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                workRequest
+            )
+
+            Timber.i("OrderMonitor scheduled: Every 15 minutes")
+        } else {
+            cancelOrderMonitor()
+        }
+    }
+
+    /**
+     * Cancel order monitoring
+     */
+    fun cancelOrderMonitor() {
+        workManager.cancelUniqueWork(OrderMonitor.WORK_NAME)
+        Timber.i("OrderMonitor scheduling cancelled")
+    }
+
+    /**
+     * Get status of order monitor work
+     */
+    fun getOrderMonitorStatus() =
+        workManager.getWorkInfosForUniqueWorkLiveData(OrderMonitor.WORK_NAME)
+
+    /**
      * Cancel all work
      */
     fun cancelAllWork() {

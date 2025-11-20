@@ -37,6 +37,80 @@ class BatchDataImporter @Inject constructor(
         const val DEFAULT_DATA_DIR = "D:\\Development\\Projects\\Mobile\\Android\\CryptoTrader\\data"
         const val CRYPTO_LAKE_OHLCV_DIR = "$DEFAULT_DATA_DIR\\crypto_lake_ohlcv"
         const val BINANCE_RAW_DIR = "$DEFAULT_DATA_DIR\\binance_raw"
+        private const val BITCOIN_GENESIS_TIME = 1231006505000L  // January 3, 2009
+        private const val MAX_PRICE_RANGE_PERCENT = 50.0  // Warn if candle has >50% range
+    }
+
+    /**
+     * Validate OHLC data integrity (same validation as HistoricalDataRepository)
+     *
+     * Checks:
+     * 1. All prices > 0
+     * 2. Volume >= 0
+     * 3. Low <= High
+     * 4. Low <= Open <= High
+     * 5. Low <= Close <= High
+     * 6. Timestamp not in future
+     * 7. Timestamp after Bitcoin genesis
+     * 8. Detect extreme price spikes
+     */
+    private fun validateOHLC(
+        timestamp: Long,
+        open: Double,
+        high: Double,
+        low: Double,
+        close: Double,
+        volume: Double,
+        asset: String
+    ): Boolean {
+        val now = System.currentTimeMillis()
+
+        // Check 1: All prices must be positive
+        if (open <= 0 || high <= 0 || low <= 0 || close <= 0) {
+            return false
+        }
+
+        // Check 2: Volume must be non-negative
+        if (volume < 0) {
+            return false
+        }
+
+        // Check 3: Low must be <= High
+        if (low > high) {
+            return false
+        }
+
+        // Check 4: Open must be between Low and High
+        if (open < low || open > high) {
+            return false
+        }
+
+        // Check 5: Close must be between Low and High
+        if (close < low || close > high) {
+            return false
+        }
+
+        // Check 6: Timestamp must not be in the future
+        if (timestamp > now + (60 * 60 * 1000)) {  // Allow 1 hour tolerance
+            return false
+        }
+
+        // Check 7: Timestamp must not be too old
+        if (timestamp < BITCOIN_GENESIS_TIME) {
+            return false
+        }
+
+        // Check 8: Detect price spikes (optional - log warning only)
+        val priceRange = high - low
+        val avgPrice = (high + low) / 2.0
+        val rangePercent = (priceRange / avgPrice) * 100.0
+
+        if (rangePercent > MAX_PRICE_RANGE_PERCENT) {
+            Timber.w("Suspicious OHLC for $asset: ${String.format("%.2f%%", rangePercent)} range in single candle")
+            // Don't reject - could be real volatility
+        }
+
+        return true
     }
 
     /**
@@ -108,7 +182,7 @@ class BatchDataImporter @Inject constructor(
     }
 
     /**
-     * Import CSV file
+     * Import CSV file with comprehensive validation
      */
     private suspend fun importCsvFile(parsedFile: ParsedDataFile): Flow<ImportProgress> = flow {
         emit(ImportProgress.inProgress("Reading CSV: ${parsedFile.fileName}", 0f))
@@ -128,29 +202,51 @@ class BatchDataImporter @Inject constructor(
             Timber.i("CSV header: $header")
             Timber.i("CSV rows: ${dataLines.size}")
 
-            // Detect CSV format and parse
+            // Detect CSV format and parse with validation
             val bars = mutableListOf<OHLCBarEntity>()
             var processedRows = 0
+            var invalidRows = 0
 
             dataLines.forEach { line ->
                 try {
                     val parts = line.split(",")
                     if (parts.size >= 6) {
-                        val bar = OHLCBarEntity(
-                            asset = parsedFile.asset,
-                            timeframe = parsedFile.timeframe,
-                            timestamp = parts[0].toLongOrNull() ?: 0L,
-                            open = parts[1].toDoubleOrNull() ?: 0.0,
-                            high = parts[2].toDoubleOrNull() ?: 0.0,
-                            low = parts[3].toDoubleOrNull() ?: 0.0,
-                            close = parts[4].toDoubleOrNull() ?: 0.0,
-                            volume = parts[5].toDoubleOrNull() ?: 0.0,
-                            trades = parts.getOrNull(6)?.toIntOrNull() ?: 0,
-                            source = parsedFile.exchange,
-                            dataTier = parsedFile.dataTier.name,
-                            importedAt = System.currentTimeMillis()
-                        )
-                        bars.add(bar)
+                        // Parse values with strict validation
+                        val timestamp = parts[0].toLongOrNull()
+                        val open = parts[1].toDoubleOrNull()
+                        val high = parts[2].toDoubleOrNull()
+                        val low = parts[3].toDoubleOrNull()
+                        val close = parts[4].toDoubleOrNull()
+                        val volume = parts[5].toDoubleOrNull()
+
+                        // Validate all values are non-null and pass OHLC validation
+                        if (timestamp != null && open != null && high != null &&
+                            low != null && close != null && volume != null &&
+                            validateOHLC(timestamp, open, high, low, close, volume, parsedFile.asset)) {
+
+                            val bar = OHLCBarEntity(
+                                asset = parsedFile.asset,
+                                timeframe = parsedFile.timeframe,
+                                timestamp = timestamp,
+                                open = open,
+                                high = high,
+                                low = low,
+                                close = close,
+                                volume = volume,
+                                trades = parts.getOrNull(6)?.toIntOrNull() ?: 0,
+                                source = parsedFile.exchange,
+                                dataTier = parsedFile.dataTier.name,
+                                importedAt = System.currentTimeMillis()
+                            )
+                            bars.add(bar)
+                        } else {
+                            invalidRows++
+                            if (invalidRows <= 5) {
+                                Timber.w("Invalid CSV row (showing first 5): $line")
+                            }
+                        }
+                    } else {
+                        invalidRows++
                     }
 
                     // Batch insert every 1000 rows
@@ -173,8 +269,16 @@ class BatchDataImporter @Inject constructor(
                 processedRows += bars.size
             }
 
-            Timber.i("✅ Imported $processedRows bars from ${parsedFile.fileName}")
-            emit(ImportProgress.completed("Imported $processedRows bars", processedRows.toLong()))
+            val totalRows = dataLines.size
+            val validationRate = if (totalRows > 0) (processedRows.toDouble() / totalRows * 100) else 0.0
+
+            Timber.i("✅ Imported $processedRows valid bars from ${parsedFile.fileName}")
+            Timber.i("   Validation: $processedRows valid, $invalidRows invalid (${String.format("%.1f%%", validationRate)} pass rate)")
+
+            emit(ImportProgress.completed(
+                "Imported $processedRows valid bars ($invalidRows invalid filtered)",
+                processedRows.toLong()
+            ))
 
         } catch (e: Exception) {
             Timber.e(e, "CSV import failed")

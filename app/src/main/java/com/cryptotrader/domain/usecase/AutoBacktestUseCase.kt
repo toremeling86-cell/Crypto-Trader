@@ -4,6 +4,7 @@ import com.cryptotrader.data.repository.HistoricalDataRepository
 import com.cryptotrader.domain.backtesting.BacktestEngine
 import com.cryptotrader.domain.backtesting.BacktestResult
 import com.cryptotrader.domain.model.Strategy
+import com.cryptotrader.utils.toBigDecimalMoney
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -82,11 +83,12 @@ class AutoBacktestUseCase @Inject constructor(
             Timber.d("Running backtest with ${recentData.size} data points")
 
             // Run backtest
-            val backtestResult = backtestEngine.runBacktest(
+            val resultDecimal = backtestEngine.runBacktestDecimal(
                 strategy = strategy,
                 historicalData = recentData,
-                startingBalance = startingBalance
+                startingBalance = startingBalance.toBigDecimalMoney()
             )
+            val backtestResult = resultDecimal.toBacktestResult()
 
             // Validate results
             val validation = validateBacktestResults(backtestResult)

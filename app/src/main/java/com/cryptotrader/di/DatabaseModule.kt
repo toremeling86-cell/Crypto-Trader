@@ -54,6 +54,12 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideOrderDao(database: AppDatabase): com.cryptotrader.data.local.dao.OrderDao {
+        return database.orderDao()
+    }
+
+    @Provides
+    @Singleton
     fun providePortfolioSnapshotDao(database: AppDatabase): PortfolioSnapshotDao {
         return database.portfolioSnapshotDao()
     }

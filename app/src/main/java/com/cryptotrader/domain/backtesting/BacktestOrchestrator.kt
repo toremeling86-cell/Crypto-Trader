@@ -4,6 +4,7 @@ import com.cryptotrader.data.local.dao.BacktestRunDao
 import com.cryptotrader.data.local.entities.BacktestRunEntity
 import com.cryptotrader.domain.model.DataTier
 import com.cryptotrader.domain.model.Strategy
+import com.cryptotrader.utils.toBigDecimalMoney
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -86,13 +87,16 @@ class BacktestOrchestrator @Inject constructor(
             Timber.i("   Bars: ${dataSet.priceBars.size}")
             Timber.i("   Quality Score: ${String.format("%.2f", dataSet.dataQualityScore)}")
 
-            // Step 2: Run backtest
-            val result = backtestEngine.runBacktest(
+            // Step 2: Run backtest (BigDecimal for exact calculations)
+            val resultDecimal = backtestEngine.runBacktestDecimal(
                 strategy = strategy,
                 historicalData = dataSet.priceBars,
-                startingBalance = startingBalance,
+                startingBalance = startingBalance.toBigDecimalMoney(),
                 ohlcBars = dataSet.ohlcBars  // For data tier validation
             )
+
+            // Convert to legacy BacktestResult for compatibility
+            val result = resultDecimal.toBacktestResult()
 
             // Step 3: Persist results to database
             if (result.validationError == null && result.totalTrades > 0) {
@@ -203,13 +207,16 @@ class BacktestOrchestrator @Inject constructor(
                 )
             }
 
-            // Run backtest
-            val result = backtestEngine.runBacktest(
+            // Run backtest (BigDecimal for exact calculations)
+            val resultDecimal = backtestEngine.runBacktestDecimal(
                 strategy = strategy,
                 historicalData = dataSet.priceBars,
-                startingBalance = startingBalance,
+                startingBalance = startingBalance.toBigDecimalMoney(),
                 ohlcBars = dataSet.ohlcBars
             )
+
+            // Convert to legacy BacktestResult for compatibility
+            val result = resultDecimal.toBacktestResult()
 
             // Persist results
             if (result.validationError == null && result.totalTrades > 0) {

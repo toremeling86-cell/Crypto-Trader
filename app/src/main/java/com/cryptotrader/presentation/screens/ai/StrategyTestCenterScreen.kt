@@ -24,6 +24,8 @@ fun StrategyTestCenterScreen(
     viewModel: StrategyTestCenterViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val availableDatasets by viewModel.availableDatasets.collectAsState()
+    val activeDataset by viewModel.activeDataset.collectAsState()
 
     Column(
         modifier = Modifier
@@ -65,7 +67,10 @@ fun StrategyTestCenterScreen(
                     selectedStrategy = uiState.selectedStrategy,
                     onStrategySelected = { viewModel.selectStrategy(it) },
                     backtestConfig = uiState.backtestConfig,
-                    onStartBacktest = { viewModel.runBacktest() }
+                    onStartBacktest = { viewModel.runBacktest() },
+                    availableDatasets = availableDatasets,
+                    activeDataset = activeDataset,
+                    onDatasetSelected = { viewModel.activateDataset(it) }
                 )
             }
         }
@@ -78,80 +83,92 @@ fun StrategySelectionView(
     selectedStrategy: Strategy?,
     onStrategySelected: (Strategy) -> Unit,
     backtestConfig: BacktestConfig,
-    onStartBacktest: () -> Unit
+    onStartBacktest: () -> Unit,
+    availableDatasets: List<com.cryptotrader.domain.model.ManagedDataset>,
+    activeDataset: com.cryptotrader.domain.model.ManagedDataset?,
+    onDatasetSelected: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // Strategy Selection
-        Text(
-            text = "1. Select Strategy",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Dataset Manager Section
+        item {
+            DatasetSelectorSection(
+                availableDatasets = availableDatasets,
+                activeDataset = activeDataset,
+                onDatasetSelected = onDatasetSelected
+            )
+        }
+
+        // Strategy Selection Header
+        item {
+            Text(
+                text = "1. Select Strategy",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
         if (strategies.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Text(
-                        text = "No strategies available",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Create a strategy in the AI Assistant tab first",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No strategies available",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Create a strategy in the AI Assistant tab first",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(strategies) { strategy ->
-                    StrategySelectCard(
-                        strategy = strategy,
-                        isSelected = selectedStrategy?.id == strategy.id,
-                        onSelect = { onStrategySelected(strategy) }
-                    )
-                }
+            items(strategies) { strategy ->
+                StrategySelectCard(
+                    strategy = strategy,
+                    isSelected = selectedStrategy?.id == strategy.id,
+                    onSelect = { onStrategySelected(strategy) }
+                )
             }
         }
 
         if (selectedStrategy != null) {
-            Spacer(modifier = Modifier.height(16.dp))
+            // Backtest Configuration Header
+            item {
+                Text(
+                    text = "2. Test Configuration",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-            // Backtest Configuration
-            Text(
-                text = "2. Test Configuration",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            BacktestConfigCard(config = backtestConfig)
-
-            Spacer(modifier = Modifier.height(24.dp))
+            item {
+                BacktestConfigCard(config = backtestConfig)
+            }
 
             // Run Backtest Button
-            Button(
-                onClick = onStartBacktest,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Run Backtest", style = MaterialTheme.typography.titleMedium)
+            item {
+                Button(
+                    onClick = onStartBacktest,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 16.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Run Backtest", style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
     }
@@ -446,5 +463,165 @@ fun MetricRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+@Composable
+fun DatasetSelectorSection(
+    availableDatasets: List<com.cryptotrader.domain.model.ManagedDataset>,
+    activeDataset: com.cryptotrader.domain.model.ManagedDataset?,
+    onDatasetSelected: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "📊 Dataset Manager",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Select a curated dataset for backtesting",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (availableDatasets.isEmpty()) {
+                Text(
+                    text = "No datasets available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                )
+            } else {
+                availableDatasets.forEach { dataset ->
+                    DatasetCard(
+                        dataset = dataset,
+                        isActive = dataset.id == activeDataset?.id,
+                        onClick = { onDatasetSelected(dataset.id) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatasetCard(
+    dataset: com.cryptotrader.domain.model.ManagedDataset,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isActive) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isActive) 4.dp else 1.dp
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isActive) {
+                        Text(
+                            text = "✓",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = dataset.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                    if (dataset.isFavorite) {
+                        Text("⭐", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = dataset.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isActive) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "🪙 ${dataset.asset}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        }
+                    )
+                    Text(
+                        text = "⏱ ${dataset.timeframe}m",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        }
+                    )
+                    Text(
+                        text = "📊 ${dataset.barCount} bars",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Tier: ${dataset.dataTier.tierName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isActive) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    }
+                )
+            }
+        }
     }
 }

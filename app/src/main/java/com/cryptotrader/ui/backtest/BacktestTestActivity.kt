@@ -47,6 +47,8 @@ fun BacktestTestScreen(
     val availableDataFiles by viewModel.availableDataFiles.collectAsState()
     val currentProposal by viewModel.currentProposal.collectAsState()
     val latestResult by viewModel.latestResult.collectAsState()
+    val availableDatasets by viewModel.availableDatasets.collectAsState()
+    val activeDataset by viewModel.activeDataset.collectAsState()
 
     Column(
         modifier = Modifier
@@ -58,6 +60,15 @@ fun BacktestTestScreen(
         Text(
             text = "🧪 Backtest System Test",
             style = MaterialTheme.typography.headlineMedium
+        )
+
+        // Dataset Selector Section
+        DatasetSelectorSection(
+            availableDatasets = availableDatasets,
+            activeDataset = activeDataset,
+            onDatasetSelected = { datasetId ->
+                viewModel.activateDataset(datasetId)
+            }
         )
 
         // Status Card
@@ -251,6 +262,165 @@ fun BacktestTestScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("🔄 Reset")
+        }
+    }
+}
+
+@Composable
+fun DatasetSelectorSection(
+    availableDatasets: List<com.cryptotrader.domain.model.ManagedDataset>,
+    activeDataset: com.cryptotrader.domain.model.ManagedDataset?,
+    onDatasetSelected: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "📊 Dataset Manager",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Select a curated dataset for backtesting",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (availableDatasets.isEmpty()) {
+                Text(
+                    text = "No datasets available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                )
+            } else {
+                availableDatasets.forEach { dataset ->
+                    DatasetCard(
+                        dataset = dataset,
+                        isActive = dataset.id == activeDataset?.id,
+                        onClick = { onDatasetSelected(dataset.id) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DatasetCard(
+    dataset: com.cryptotrader.domain.model.ManagedDataset,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isActive) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isActive) 4.dp else 1.dp
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    if (isActive) {
+                        Text(
+                            text = "✓",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = dataset.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                    if (dataset.isFavorite) {
+                        Text("⭐", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = dataset.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isActive) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "🪙 ${dataset.asset}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        }
+                    )
+                    Text(
+                        text = "⏱ ${dataset.timeframe}m",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        }
+                    )
+                    Text(
+                        text = "📊 ${dataset.barCount} bars",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Tier: ${dataset.dataTier.tierName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isActive) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    }
+                )
+            }
         }
     }
 }

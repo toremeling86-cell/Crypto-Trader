@@ -2,6 +2,7 @@ package com.cryptotrader.domain.backtesting
 
 import com.cryptotrader.domain.model.DataTier
 import com.cryptotrader.domain.model.TradeType
+import com.cryptotrader.utils.toBigDecimalMoney
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -42,12 +43,13 @@ class BacktestIntegrationTest {
         val strategy = TestStrategies.buyAndHold().copy(isActive = true)
 
         // Run backtest
-        val result = backtestEngine.runBacktest(
+        val resultDecimal = backtestEngine.runBacktestDecimal(
             strategy = strategy,
             historicalData = data,
-            startingBalance = 10000.0,
+            startingBalance = 10000.0.toBigDecimalMoney(),
             costModel = TradingCostModel()
         )
+        val result = resultDecimal.toBacktestResult()
 
         // Validate results
         println("\n=== Backtest Results ===")

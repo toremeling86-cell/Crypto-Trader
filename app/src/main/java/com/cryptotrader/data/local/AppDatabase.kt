@@ -11,6 +11,7 @@ import com.cryptotrader.data.local.entities.*
         TradeEntity::class,
         StrategyEntity::class,
         PositionEntity::class,
+        OrderEntity::class,
         PortfolioSnapshotEntity::class,
         MarketSnapshotEntity::class,
         AIMarketAnalysisEntity::class,
@@ -28,7 +29,7 @@ import com.cryptotrader.data.local.entities.*
         DataQuarterCoverageEntity::class,
         KnowledgeBaseEntity::class
     ],
-    version = 21, // Migration 20→21: Add BigDecimal support to positions table (Phase 2.9)
+    version = 22, // Migration 21→22: Add OrderEntity for order lifecycle tracking
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -37,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tradeDao(): TradeDao
     abstract fun strategyDao(): StrategyDao
     abstract fun positionDao(): PositionDao
+    abstract fun orderDao(): OrderDao
     abstract fun portfolioSnapshotDao(): PortfolioSnapshotDao
     abstract fun marketSnapshotDao(): MarketSnapshotDao
     abstract fun aiMarketAnalysisDao(): AIMarketAnalysisDao

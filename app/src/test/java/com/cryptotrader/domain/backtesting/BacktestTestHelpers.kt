@@ -78,7 +78,7 @@ object BacktestTestFactory {
         val marketDataAdapter = MarketDataAdapter()
 
         // Create all required calculators for StrategyEvaluatorV2 using Mockito mocks
-        val rsiCalculator: RsiCalculator = mock()
+        val rsiCalculator: RsiCalculator = com.cryptotrader.domain.indicators.rsi.RsiCalculatorImpl()
         val maCalculator: MovingAverageCalculator = mock()
         val macdCalculator: MacdCalculator = mock()
         val bollingerCalculator: BollingerBandsCalculator = mock()

@@ -1059,6 +1059,58 @@ object DatabaseMigrations {
     }
 
     /**
+     * Migration from version 21 to 22
+     *
+     * Changes:
+     * - Add OrderEntity table for order lifecycle tracking
+     * - Enables persistent order history and recovery
+     */
+    val MIGRATION_21_22 = object : Migration(21, 22) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            Timber.i("=== Starting Database Migration 21 → 22 ===")
+            Timber.i("Purpose: Add OrderEntity table for order lifecycle tracking")
+
+            // Create orders table
+            database.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS orders (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    positionId TEXT,
+                    pair TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    orderType TEXT NOT NULL,
+                    quantity REAL NOT NULL,
+                    price REAL,
+                    stopPrice REAL,
+                    krakenOrderId TEXT,
+                    status TEXT NOT NULL,
+                    placedAt INTEGER NOT NULL,
+                    filledAt INTEGER,
+                    cancelledAt INTEGER,
+                    filledQuantity REAL NOT NULL DEFAULT 0.0,
+                    averageFillPrice REAL,
+                    fee REAL,
+                    errorMessage TEXT,
+                    FOREIGN KEY(positionId) REFERENCES positions(id) ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+
+            // Create indexes for efficient queries
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_orders_positionId ON orders(positionId)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_orders_krakenOrderId ON orders(krakenOrderId)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_orders_status ON orders(status)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_orders_placedAt ON orders(placedAt)")
+
+            Timber.i("✅ Migration 21 → 22 complete")
+            Timber.i("   - orders table created with 17 columns")
+            Timber.i("   - Foreign key to positions table (ON DELETE CASCADE)")
+            Timber.i("   - 4 indexes created for efficient queries")
+            Timber.i("   - Order lifecycle tracking enabled (PENDING → OPEN → FILLED/CANCELLED/REJECTED)")
+        }
+    }
+
+    /**
      * Get all migrations
      */
     fun getAllMigrations(): Array<Migration> {
@@ -1082,7 +1134,8 @@ object DatabaseMigrations {
             MIGRATION_17_18,
             MIGRATION_18_19,
             MIGRATION_19_20,
-            MIGRATION_20_21
+            MIGRATION_20_21,
+            MIGRATION_21_22
         )
     }
 }

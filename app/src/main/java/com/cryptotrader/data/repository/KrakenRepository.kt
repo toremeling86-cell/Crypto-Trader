@@ -24,6 +24,7 @@ class KrakenRepository @Inject constructor(
     private val krakenApi: KrakenApiService,
     private val webSocketClient: KrakenWebSocketClient,
     private val tradeDao: TradeDao,
+    private val orderDao: com.cryptotrader.data.local.dao.OrderDao,
     private val rateLimiter: RateLimiter,
     private val paperTradingManager: com.cryptotrader.domain.trading.PaperTradingManager,
     private val context: android.content.Context
@@ -103,6 +104,30 @@ class KrakenRepository @Inject constructor(
     }
 
     suspend fun placeOrder(request: TradeRequest, retryCount: Int = 0): Result<Trade> {
+        // PHASE 1: Create pending order record BEFORE Kraken API call
+        val orderId = java.util.UUID.randomUUID().toString()
+        val orderEntity = com.cryptotrader.data.local.entities.OrderEntity(
+            id = orderId,
+            positionId = null, // Will be linked by PositionTracker if needed
+            pair = request.pair,
+            type = request.type.toString(),
+            orderType = request.orderType.name,
+            quantity = request.volume,
+            price = if (request.orderType == com.cryptotrader.domain.usecase.OrderType.LIMIT) request.price else null,
+            stopPrice = null,
+            krakenOrderId = null, // Will update after Kraken response
+            status = "PENDING",
+            placedAt = System.currentTimeMillis()
+        )
+
+        try {
+            orderDao.insertOrder(orderEntity)
+            Timber.d("📝 Order ${orderId.substring(0, 8)}... saved as PENDING")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save pending order to database")
+            // Continue anyway - don't fail the order just because DB write failed
+        }
+
         // Check if paper trading mode is enabled
         if (com.cryptotrader.utils.CryptoUtils.isPaperTradingMode(context)) {
             Timber.d("📄 Simulating paper trade: ${request.type} ${request.volume} ${request.pair}")
@@ -117,16 +142,38 @@ class KrakenRepository @Inject constructor(
 
             val tradeResult = paperTradingManager.simulatePlaceOrder(request, currentPrice)
 
-            // Save paper trade to database
+            // Update order status based on paper trading result
             if (tradeResult.isSuccess) {
                 val trade = tradeResult.getOrNull()!!
                 val tradeEntity = trade.toEntity()
                 tradeDao.insertTrade(tradeEntity)
+
+                // Mark order as FILLED for paper trading
+                try {
+                    orderDao.markOrderFilled(
+                        id = orderId,
+                        filledAt = trade.timestamp,
+                        filledQuantity = trade.volume,
+                        averageFillPrice = trade.price,
+                        fee = trade.fee
+                    )
+                    orderDao.updateKrakenOrderId(orderId, trade.orderId) // Use paper trade ID
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to update paper order status")
+                }
+            } else {
+                // Mark order as REJECTED if paper trading failed
+                try {
+                    orderDao.markOrderRejected(orderId, tradeResult.exceptionOrNull()?.message ?: "Paper trading failed")
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to mark order as rejected")
+                }
             }
 
             return tradeResult
         }
 
+        // PHASE 2: Place order on Kraken
         return try {
             // Rate limit for private API (placing orders is the most critical operation)
             rateLimiter.waitForPrivateApiPermission()
@@ -148,12 +195,28 @@ class KrakenRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
                 if (body.error.isEmpty() && body.result != null) {
-                    val orderId = body.result.transactionIds.firstOrNull()
-                        ?: return Result.failure(Exception("No order ID returned"))
+                    val krakenOrderId = body.result.transactionIds.firstOrNull()
+
+                    if (krakenOrderId == null) {
+                        // Mark as REJECTED
+                        try {
+                            orderDao.markOrderRejected(orderId, "No Kraken order ID returned")
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to mark order as rejected")
+                        }
+                        return Result.failure(Exception("No order ID returned"))
+                    }
+
+                    // PHASE 3: Update order with Kraken order ID (status: OPEN for market orders, FILLED after execution)
+                    try {
+                        orderDao.updateKrakenOrderId(orderId, krakenOrderId)
+                        Timber.d("✅ Order linked to Kraken ID: $krakenOrderId")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to update Kraken order ID")
+                    }
 
                     // Calculate fee based on Kraken's standard fee structure
                     // Default tier: 0.26% taker fee for market orders, 0.16% maker fee for limit orders
-                    // TODO: Fetch actual fee from QueryOrders endpoint after order executes
                     val cost = request.price * request.volume
                     val feePercent = if (request.orderType == com.cryptotrader.domain.usecase.OrderType.MARKET) {
                         0.0026 // 0.26% taker fee
@@ -163,7 +226,7 @@ class KrakenRepository @Inject constructor(
                     val calculatedFee = cost * feePercent
 
                     val trade = Trade(
-                        orderId = orderId,
+                        orderId = krakenOrderId,
                         pair = request.pair,
                         type = request.type,
                         price = request.price,
@@ -175,14 +238,36 @@ class KrakenRepository @Inject constructor(
                         status = TradeStatus.EXECUTED
                     )
 
-                    // Save to database
+                    // Save trade to database
                     val tradeEntity = trade.toEntity()
                     tradeDao.insertTrade(tradeEntity)
 
-                    Timber.d("Order placed successfully: $orderId")
+                    // PHASE 4: Mark order as FILLED (for market orders that execute immediately)
+                    if (request.orderType == com.cryptotrader.domain.usecase.OrderType.MARKET) {
+                        try {
+                            orderDao.markOrderFilled(
+                                id = orderId,
+                                filledAt = trade.timestamp,
+                                filledQuantity = trade.volume,
+                                averageFillPrice = trade.price,
+                                fee = trade.fee
+                            )
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to mark order as filled")
+                        }
+                    }
+
+                    Timber.i("✅ Order placed successfully: $krakenOrderId")
                     Result.success(trade)
                 } else {
                     val errorMessage = body.error.joinToString()
+
+                    // Mark order as REJECTED
+                    try {
+                        orderDao.markOrderRejected(orderId, errorMessage)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to mark order as rejected")
+                    }
 
                     // Check if error is retryable
                     if (isRetryableError(errorMessage) && retryCount < MAX_RETRY_ATTEMPTS) {
@@ -203,6 +288,13 @@ class KrakenRepository @Inject constructor(
                     return placeOrder(request, retryCount + 1)
                 }
 
+                // Mark order as REJECTED
+                try {
+                    orderDao.markOrderRejected(orderId, "HTTP ${response.code()}")
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to mark order as rejected")
+                }
+
                 Result.failure(Exception("API call failed: ${response.code()}"))
             }
         } catch (e: Exception) {
@@ -212,6 +304,13 @@ class KrakenRepository @Inject constructor(
                 Timber.w(e, "Network exception, attempt ${retryCount + 1}/$MAX_RETRY_ATTEMPTS. Retrying in ${delayMs}ms")
                 kotlinx.coroutines.delay(delayMs)
                 return placeOrder(request, retryCount + 1)
+            }
+
+            // Mark order as REJECTED
+            try {
+                orderDao.markOrderRejected(orderId, e.message ?: "Unknown error")
+            } catch (dbError: Exception) {
+                Timber.e(dbError, "Failed to mark order as rejected")
             }
 
             Timber.e(e, "Error placing order after $retryCount retries")
@@ -277,6 +376,50 @@ class KrakenRepository @Inject constructor(
         }
     }
 
+    fun getRecentOrders(limit: Int = 50): Flow<List<Order>> {
+        return orderDao.getRecentOrders(limit).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    suspend fun cancelOrder(orderId: String): Result<Unit> {
+        val order = orderDao.getOrderById(orderId) ?: return Result.failure(Exception("Order not found"))
+
+        // If paper trading, just cancel locally
+        if (com.cryptotrader.utils.CryptoUtils.isPaperTradingMode(context)) {
+            orderDao.markOrderCancelled(orderId, System.currentTimeMillis())
+            return Result.success(Unit)
+        }
+
+        // If pending (not yet sent to Kraken), just cancel locally
+        if (order.krakenOrderId == null) {
+            orderDao.markOrderCancelled(orderId, System.currentTimeMillis())
+            return Result.success(Unit)
+        }
+
+        // Cancel on Kraken
+        return try {
+            rateLimiter.waitForPrivateApiPermission()
+            val nonce = CryptoUtils.generateNonce()
+            val response = krakenApi.cancelOrder(nonce, order.krakenOrderId)
+
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                if (body.error.isEmpty()) {
+                    orderDao.markOrderCancelled(orderId, System.currentTimeMillis())
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception("Kraken API Error: ${body.error.joinToString()}"))
+                }
+            } else {
+                Result.failure(Exception("API call failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error cancelling order")
+            Result.failure(e)
+        }
+    }
+
     private fun Trade.toEntity() = TradeEntity(
         orderId = orderId,
         pair = pair,
@@ -304,5 +447,25 @@ class KrakenRepository @Inject constructor(
         strategyId = strategyId,
         status = TradeStatus.fromString(status),
         profit = profit
+    )
+
+    private fun com.cryptotrader.data.local.entities.OrderEntity.toDomain() = Order(
+        id = id,
+        positionId = positionId,
+        pair = pair,
+        type = TradeType.fromString(type),
+        orderType = OrderType.fromString(orderType),
+        quantity = quantity,
+        price = price,
+        stopPrice = stopPrice,
+        krakenOrderId = krakenOrderId,
+        status = OrderStatus.fromString(status),
+        placedAt = placedAt,
+        filledAt = filledAt,
+        cancelledAt = cancelledAt,
+        filledQuantity = filledQuantity,
+        averageFillPrice = averageFillPrice,
+        fee = fee,
+        errorMessage = errorMessage
     )
 }

@@ -7,9 +7,11 @@ import com.cryptotrader.data.dataimport.ParsedDataFile
 import com.cryptotrader.domain.backtesting.BacktestOrchestrator
 import com.cryptotrader.domain.backtesting.BacktestProposalGenerator
 import com.cryptotrader.domain.backtesting.BacktestResult
+import com.cryptotrader.domain.data.DatasetManager
 import com.cryptotrader.domain.model.BacktestDecision
 import com.cryptotrader.domain.model.BacktestProposal
 import com.cryptotrader.domain.model.DataTier
+import com.cryptotrader.domain.model.ManagedDataset
 import com.cryptotrader.domain.model.Strategy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +40,8 @@ import javax.inject.Inject
 class BacktestManagementViewModel @Inject constructor(
     private val batchDataImporter: BatchDataImporter,
     private val backtestProposalGenerator: BacktestProposalGenerator,
-    private val backtestOrchestrator: BacktestOrchestrator
+    private val backtestOrchestrator: BacktestOrchestrator,
+    private val datasetManager: DatasetManager
 ) : ViewModel() {
 
     // ==============================
@@ -56,6 +59,9 @@ class BacktestManagementViewModel @Inject constructor(
 
     private val _latestResult = MutableStateFlow<BacktestResult?>(null)
     val latestResult: StateFlow<BacktestResult?> = _latestResult.asStateFlow()
+
+    val availableDatasets: StateFlow<List<ManagedDataset>> = datasetManager.availableDatasets
+    val activeDataset: StateFlow<ManagedDataset?> = datasetManager.activeDataset
 
     // ==============================
     // DATA IMPORT FUNCTIONS
@@ -256,6 +262,18 @@ class BacktestManagementViewModel @Inject constructor(
 
     fun resetState() {
         _uiState.value = BacktestUiState.Idle
+    }
+
+    // ==============================
+    // DATASET MANAGEMENT
+    // ==============================
+
+    fun activateDataset(datasetId: String) {
+        datasetManager.activateDataset(datasetId)
+    }
+
+    fun importDataset(filePath: String, name: String, asset: String) {
+        datasetManager.importFromCsv(filePath, name, asset)
     }
 }
 

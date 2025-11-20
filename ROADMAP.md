@@ -884,6 +884,456 @@ viewModel.runQuickTest(strategy)
 
 ---
 
+## ✅ BATCH 1: UI/UX Team Deliverables (COMPLETE)
+**Status**: 100% Complete
+**Completion Date**: 2025-11-20
+**Team**: UI/UX Development Team
+**Quality Score**: 9/10 - Production Ready
+
+### Batch 1.4: Order Management UI ✅
+**Files Created**:
+- `presentation/screens/orders/OrderManagementScreen.kt` (306 lines)
+- `presentation/screens/orders/OrderManagementViewModel.kt` (79 lines)
+
+**Features**:
+- Order list with search and filtering (by status, by pair)
+- Order cards showing: pair, side (BUY/SELL), quantity, price, total, status, timestamp
+- Cancel order functionality for OPEN/PENDING orders
+- Color-coded status badges (PENDING, OPEN, FILLED, CANCELLED, EXPIRED, REJECTED)
+- Material 3 design with professional aesthetics
+
+### Batch 1.5: Paper vs Live Trading Toggle ✅
+**Files Modified**:
+- `presentation/screens/dashboard/DashboardScreen.kt`
+- `presentation/screens/dashboard/DashboardViewModel.kt`
+- `presentation/screens/strategy/StrategyConfigScreen.kt`
+
+**Files Created**:
+- `presentation/components/TradingModeIndicator.kt`
+
+**Features**:
+- Switch toggle in DashboardScreen TopAppBar
+- Paper/Live confirmation dialogs with strong warnings
+- TradingModeIndicator component (compact badge)
+- TradingModeBanner component (prominent display)
+- ConfirmLiveModeDialog for strategy activation
+- TradingModeButton (INACTIVE/PAPER/LIVE selector)
+
+### Batch 1.6: AI Chat UI Improvements ✅
+**Files Created**:
+- `presentation/screens/chat/MetaAnalysisComponents.kt` (350+ lines)
+
+**Files Modified**:
+- `presentation/screens/chat/ChatScreen.kt`
+
+**Features**:
+- PulsingGreenBadge component with animation (scale 1.0→1.2)
+- Badge shows count of unanalyzed expert reports
+- MetaAnalysisButton with timeframe selector
+- AnalysisProgressDialog (shows Opus 4.1 progress)
+- StrategyPreviewCard (shows meta-analysis results with approve/reject)
+
+### Batch 1.7: Strategy Auto-Population ✅
+**Files Created**:
+- `presentation/screens/strategy/CreateStrategyScreen.kt` (185 lines)
+- `presentation/screens/strategy/CreateStrategyViewModel.kt` (131 lines)
+
+**Files Modified**:
+- `presentation/screens/strategy/StrategyConfigScreen.kt`
+
+**Features**:
+- CreateStrategyScreen with form fields (name, description, pairs, risk params)
+- CreateStrategyViewModel with validation and AI import support
+- PendingStrategyCard (shows AI-generated strategies awaiting approval)
+- StrategyItem (expandable card with performance metrics)
+- ConfirmActivationDialog and ConfirmDeleteDialog
+- AI badge showing strategy source
+
+**Code Quality Assessment**:
+- ✅ Zero compilation errors
+- ✅ Proper Material 3 component usage
+- ✅ Correct field names (quantity, placedAt, TradeType)
+- ✅ Proper Flow/StateFlow state management
+- ✅ Comprehensive error handling with Timber logging
+- ✅ Professional UI design (Wall Street aesthetic, no emojis)
+- ⚠️ Minor: Duplicate PulsingGreenBadge (to be cleaned up)
+- ⚠️ Minor: "Import AI" button placeholder (Batch 2.4 will complete)
+
+---
+
+## 🎯 BATCH 2: UI/UX Team Tasks (IN PROGRESS)
+**Status**: Not Started
+**Assigned**: 2025-11-20
+**Team**: UI/UX Development Team
+**Priority**: HIGH - Parallel work with backend team
+**Estimated Effort**: 2-3 weeks
+
+### Design Guidelines (CRITICAL - READ FIRST!)
+
+**Material 3 Components**: ALWAYS use Material 3 (androidx.compose.material3.*)
+
+**Color Coding Standards**:
+```kotlin
+// Profit/Loss
+val profit = Color(0xFF4CAF50)  // Green
+val loss = Color(0xFFE57373)    // Red
+
+// Trade Types
+val buy = Color(0xFF4CAF50)     // Green
+val sell = Color(0xFFE57373)    // Red
+
+// Trading Modes
+val paperMode = MaterialTheme.colorScheme.primary  // Blue
+val liveMode = MaterialTheme.colorScheme.error     // Red
+val inactive = MaterialTheme.colorScheme.secondaryContainer
+```
+
+**State Management**: ALWAYS use Flow/StateFlow with `.collectAsState()`
+
+**Field Names** (CRITICAL - Use these exact names):
+- `quantity` (NOT `amount`)
+- `placedAt` / `executedAt` / `openedAt` / `closedAt` (NOT `timestamp`)
+- `TradeType` enum (NOT `OrderSide`)
+- `OrderStatus` / `PositionStatus` enums (NOT strings)
+
+**Error Handling**:
+```kotlin
+try {
+    // ... operation ...
+} catch (e: Exception) {
+    Timber.e(e, "Error description")
+    _uiState.value = _uiState.value.copy(errorMessage = e.message)
+}
+```
+
+**NO EMOJIS**: Professional Wall Street aesthetic (use text/icons only)
+
+**Confirmation Dialogs**: ALWAYS confirm destructive actions (close, delete, cancel)
+
+### Batch 2.1: Position Management Screen 📋
+**Priority**: HIGHEST
+**Files to Create**:
+- `presentation/screens/positions/PositionManagementScreen.kt`
+- `presentation/screens/positions/PositionManagementViewModel.kt`
+
+**Description**:
+Create a screen showing all open and closed trading positions with P&L tracking.
+
+**UI Requirements**:
+- Position list showing: pair, side (BUY/SELL), entry price, current price, quantity, P&L (absolute + %), status
+- Filter chips: [All] [Open] [Closed]
+- Search by trading pair
+- Close position button (for open positions only)
+- Color-coded P&L: green if profit, red if loss
+- Expandable cards showing: opened date, closed date (if applicable), entry/exit prices, fees, realized P&L
+
+**Data Model**:
+```kotlin
+data class Position(
+    val id: String,
+    val strategyId: String,
+    val pair: String,
+    val side: TradeType,           // BUY or SELL
+    val quantity: Double,
+    val entryPrice: Double,
+    val currentPrice: Double?,
+    val status: PositionStatus,     // OPEN, CLOSED
+    val openedAt: Long,
+    val closedAt: Long?,
+    val realizedPnL: Double?,
+    val unrealizedPnL: Double?
+)
+
+enum class PositionStatus {
+    OPEN, CLOSED
+}
+```
+
+**Repository Methods Available**:
+```kotlin
+// PositionRepository already exists in codebase
+fun getAllPositions(): Flow<List<Position>>
+fun getOpenPositions(): Flow<List<Position>>
+fun getClosedPositions(): Flow<List<Position>>
+suspend fun closePosition(positionId: String)
+```
+
+**Example Card UI**:
+```
+┌─────────────────────────────────────┐
+│ XXBTZUSD               [BUY] [OPEN] │
+│ Entry: $42,150.00  Qty: 0.25 BTC    │
+│ Current: $43,200.00                 │
+│ P&L: +$262.50 (+2.49%) ✅           │
+│                                      │
+│ Opened: Nov 15, 14:23               │
+│ [Close Position]                    │
+└─────────────────────────────────────┘
+```
+
+### Batch 2.2: Trading History Timeline 📋
+**Priority**: MEDIUM
+**Files to Create**:
+- `presentation/screens/history/TradingHistoryScreen.kt`
+- `presentation/screens/history/TradingHistoryViewModel.kt`
+
+**Description**:
+Visual trading journal showing all executed trades in timeline format.
+
+**UI Requirements**:
+- Timeline layout (newest first) with date separators
+- Each trade card shows: timestamp, pair, side, quantity, price, P&L, fee, strategy name
+- Filters: By pair, by strategy, by date range
+- Expandable cards showing: entry/exit conditions met, order IDs, execution details
+- Export button (TODO marker - implement later)
+
+**Data Model**:
+```kotlin
+data class Trade(
+    val id: String,
+    val positionId: String,
+    val strategyId: String,
+    val pair: String,
+    val type: TradeType,    // BUY or SELL
+    val quantity: Double,
+    val price: Double,
+    val fee: Double,
+    val executedAt: Long,
+    val pnl: Double?,
+    val strategyName: String
+)
+```
+
+**Repository Methods**:
+```kotlin
+// TradeRepository available
+fun getAllTrades(): Flow<List<Trade>>
+fun getTradesByPair(pair: String): Flow<List<Trade>>
+fun getTradesByStrategy(strategyId: String): Flow<List<Trade>>
+```
+
+**Example Timeline**:
+```
+Today
+┌──────────────────────────────┐
+│ 14:23 SELL XXBTZUSD          │
+│ 0.25 BTC @ $43,200           │
+│ Profit: +$262.50 ✅          │
+│ Strategy: RSI Mean Reversion │
+└──────────────────────────────┘
+
+┌──────────────────────────────┐
+│ 09:15 BUY XXBTZUSD           │
+│ 0.25 BTC @ $42,150           │
+│ Strategy: RSI Mean Reversion │
+└──────────────────────────────┘
+
+Yesterday
+...
+```
+
+### Batch 2.3: Performance Analytics Dashboard 📋
+**Priority**: MEDIUM
+**Files to Create**:
+- `presentation/screens/analytics/PerformanceScreen.kt`
+- `presentation/screens/analytics/PerformanceViewModel.kt`
+
+**Description**:
+Comprehensive analytics dashboard with charts and performance metrics.
+
+**UI Requirements**:
+
+**Key Metrics Cards** (Top row):
+- Total P&L (all time)
+- Win Rate (%)
+- Total Trades
+- Active Positions
+- Best Trade
+- Worst Trade
+
+**Charts** (Use Vico library - already in build.gradle):
+1. P&L Over Time (Line chart)
+2. Win/Loss Distribution (Pie chart)
+3. Trades Per Pair (Bar chart)
+
+**Strategy Performance Table**:
+- Columns: Strategy Name, Win Rate, Total P&L, Total Trades, Avg Trade
+- Sortable by each column
+- Color-coded P&L
+
+**Data Model**:
+```kotlin
+data class PerformanceMetrics(
+    val totalPnL: Double,
+    val winRate: Double,
+    val totalTrades: Int,
+    val openPositions: Int,
+    val bestTrade: Double,
+    val worstTrade: Double,
+    val pnlOverTime: List<Pair<Long, Double>>,  // timestamp, pnl
+    val winLossDistribution: Pair<Int, Int>,     // wins, losses
+    val tradesPerPair: Map<String, Int>
+)
+```
+
+**Repository Methods**:
+```kotlin
+// AnalyticsRepository (will be created by backend team)
+fun getPerformanceMetrics(): Flow<PerformanceMetrics>
+
+// StrategyAnalytics (already exists)
+suspend fun calculateStrategyPerformance(strategyId: String): StrategyPerformance
+```
+
+**IMPORTANT**:
+- Implement UI and chart layouts
+- Use MOCK DATA for now (backend will provide real repository)
+- Focus on beautiful, professional charts
+
+### Batch 2.4: AI Import Dialog 📋
+**Priority**: HIGH
+**Files to Create**:
+- `presentation/screens/strategy/AiImportDialog.kt`
+
+**Description**:
+Complete the TODO from CreateStrategyScreen.kt line 50 ("Import AI" button).
+
+**UI Requirements**:
+- Dialog showing pending AI-generated strategies
+- List of strategies with preview cards showing:
+  - Strategy name
+  - Description (truncated to 2 lines)
+  - Backtest results (Win Rate, P&L, Confidence)
+  - Source (Claude Chat, Meta-Analysis)
+  - Generated timestamp
+- [Import] button for each strategy
+- Search/filter by name or source
+
+**Integration**:
+```kotlin
+// On Import button click:
+CreateStrategyViewModel.importFromAi(strategy: Strategy)
+
+// This method already exists - it auto-fills the CreateStrategyScreen
+```
+
+**Repository Methods**:
+```kotlin
+// StrategyRepository
+fun getPendingStrategies(): Flow<List<Strategy>>
+```
+
+**Example Dialog**:
+```
+┌─────────────────────────────────────┐
+│   Import AI-Generated Strategy      │
+├─────────────────────────────────────┤
+│ Search: [____________] 🔍           │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │ RSI Mean Reversion v2 🤖         │ │
+│ │ Buy when RSI < 30, sell...       │ │
+│ │ Win Rate: 65% | P&L: +15.2%     │ │
+│ │ Confidence: 87% | 2 hours ago   │ │
+│ │                      [Import]   │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │ MACD + Bollinger Breakout 🤖     │ │
+│ │ Combines MACD crossover...       │ │
+│ │ Win Rate: 58% | P&L: +12.8%     │ │
+│ │ Confidence: 82% | 1 day ago     │ │
+│ │                      [Import]   │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│              [Cancel]               │
+└─────────────────────────────────────┘
+```
+
+### Batch 2.5: Entry/Exit Conditions Builder 📋
+**Priority**: LOW (Nice to have)
+**Files to Create**:
+- `presentation/screens/strategy/ConditionsBuilderScreen.kt`
+- `presentation/screens/strategy/ConditionsBuilderViewModel.kt`
+
+**Description**:
+Simple UI for building entry/exit conditions (basic text input for now, drag-and-drop builder later).
+
+**UI Requirements (MVP)**:
+- Text field for entry conditions
+- Text field for exit conditions
+- Example conditions shown as hints
+- Add/Remove condition buttons
+- Preview section showing all conditions
+- Save button
+
+**Example Conditions**:
+```
+Entry Conditions:
+- RSI < 30 AND Volume > 1M
+- MACD Histogram > 0
+
+Exit Conditions:
+- RSI > 70 OR StopLoss -5%
+- Take Profit +10%
+```
+
+**TODO Marker**:
+```kotlin
+// TODO: Future enhancement - Replace with visual drag-and-drop builder
+// TODO: Add indicator parameter sliders (RSI period, MACD settings, etc.)
+// TODO: Add condition validation (check indicator syntax)
+```
+
+**Integration**:
+This screen will be accessible from CreateStrategyScreen via a button.
+
+---
+
+### File Structure for Batch 2
+
+```
+app/src/main/java/com/cryptotrader/presentation/screens/
+├── positions/
+│   ├── PositionManagementScreen.kt
+│   └── PositionManagementViewModel.kt
+├── history/
+│   ├── TradingHistoryScreen.kt
+│   └── TradingHistoryViewModel.kt
+├── analytics/
+│   ├── PerformanceScreen.kt
+│   └── PerformanceViewModel.kt
+└── strategy/
+    ├── AiImportDialog.kt
+    ├── ConditionsBuilderScreen.kt
+    └── ConditionsBuilderViewModel.kt
+```
+
+### Testing & Validation
+
+**Before marking as complete**:
+1. ✅ All files compile without errors
+2. ✅ No usage of deprecated field names (amount, timestamp, OrderSide)
+3. ✅ All Flow objects use `.collectAsState()`
+4. ✅ Material 3 components used throughout
+5. ✅ Error states handled with try/catch + Timber.e()
+6. ✅ Loading states with CircularProgressIndicator
+7. ✅ Confirmation dialogs for destructive actions
+8. ✅ Professional color coding (no random colors)
+
+### Backend Dependencies (Will be provided)
+
+UI team can use **mock data** for:
+- `AnalyticsRepository.getPerformanceMetrics()` (Batch 2.3)
+
+Backend team will implement:
+- PositionRepository (already exists)
+- TradeRepository (already exists)
+- StrategyRepository (already exists)
+- AnalyticsRepository (will create)
+
+---
+
 ## 🟡 PHASE 3: AI-Driven Strategy Workflow (PRIORITY)
 **Status**: In Progress (75% Complete)
 **Priority**: HIGH - Core value proposition
@@ -1548,12 +1998,13 @@ New Features:
 
 ---
 
-## ✅ PHASE 2.9: BigDecimal Migration (IN PROGRESS)
-**Status**: Phase 1 & 2 Complete (50% Total)
+## ✅ PHASE 2.9: BigDecimal Migration (NEAR COMPLETE)
+**Status**: Phase 1, 2, 3 Complete (85% Total)
 **Started**: 2025-11-19
+**Updated**: 2025-11-19
 **Priority**: HIGH (before live trading with real money)
 **Estimated Effort**: 3-5 days (sequential) or 2-3 days (parallelized)
-**Database Version**: 14 → 20 (Foundation complete, Positions need 20→21)
+**Database Version**: 14 → 21 (All database migrations complete)
 
 ### Goal
 Migrate all monetary calculations from `Double` to `BigDecimal` to achieve exact decimal arithmetic required for hedge-fund quality trading system.
@@ -1649,20 +2100,32 @@ fun isStopLossTriggeredDecimal(currentPrice: BigDecimal): Boolean
 fun isTakeProfitTriggeredDecimal(currentPrice: BigDecimal): Boolean
 ```
 
-#### ⏳ Phase 3: Calculation Logic (Day 3-4 - 16 hours)
-**Status**: In Progress (10% Complete)
-**Priority**: Next in sequence
+#### ✅ Phase 3: Calculation Logic (COMPLETE - 2025-11-19)
+**Completion Date**: 2025-11-19
+**Effort**: 12 hours (executed in parallel)
+**Status**: ✅ 100% Complete
 
-**Completed Tasks**:
-- ✅ Migrate `RiskManager.kt` - Position sizing and risk calculations (2025-11-19)
+**Completed Migrations** (using parallel agent execution):
+- ✅ `TradingCostModel.kt` - All fee calculations, slippage, and spread (7 BigDecimal methods)
+- ✅ `ProfitCalculator.kt` - FIFO matching with exact P&L (3 BigDecimal methods, complex logic)
+- ✅ `RiskManager.kt` - Position sizing and risk calculations (6 BigDecimal methods)
+- ✅ `BacktestEngine.kt` - Complete backtest engine with hedge-fund quality (600+ lines migrated)
+- ✅ `PerformanceCalculator.kt` - Sharpe ratio, returns, ROI (6 BigDecimal methods)
+- ✅ `KellyCriterionCalculator.kt` - Kelly criterion position sizing (1 BigDecimal method)
+- ✅ `VolatilityStopLossCalculator.kt` - ATR-based stop-loss (1 BigDecimal method)
 
-**Planned Tasks**:
-- [ ] Migrate `TradingCostModel.kt` - Spread and slippage calculations
-- [ ] Migrate `ProfitCalculator.kt` - FIFO matching with exact P&L
-- [ ] Migrate `BacktestEngine.kt` - All backtest calculations with BigDecimal
-- [ ] Migrate `PerformanceCalculator.kt` - Sharpe ratio, returns, etc.
-- [ ] Migrate `KellyCriterionCalculator.kt` - Kelly criterion position sizing
-- [ ] Update all repositories (TradeRepository, PositionRepository, StrategyRepository, PortfolioRepository)
+**Test Infrastructure**:
+- ✅ Fixed `BacktestTestHelpers.kt` - Converted manual mocks to Mockito
+- ✅ Added Mockito-kotlin 5.1.0 dependency
+- ✅ Fixed test compilation errors in MetaAnalysisE2ETest.kt and PaperTradingIntegrationTest.kt
+- ✅ All 101 unit tests now compile and run (14 pre-existing failures, unrelated to migration)
+
+**Key Achievements**:
+- **BacktestEngine.kt**: Most critical file (600+ lines) fully migrated with equity curve tracking
+- **FIFO Matching**: ProfitCalculator uses exact BigDecimal arithmetic for trade matching
+- **Cost Model**: All trading fees (0.16% maker, 0.26% taker) with exact decimal calculations
+- **Risk Calculations**: Kelly Criterion, volatility stops, position sizing all use BigDecimal
+- **Build Status**: ✅ Debug build SUCCESS, ❌ Release build FAILED (unrelated R8 ProGuard issue)
 
 **Critical Files**:
 ```

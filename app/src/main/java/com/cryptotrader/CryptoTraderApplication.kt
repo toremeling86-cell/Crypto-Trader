@@ -4,10 +4,10 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
-// TODO: Re-enable TradingWorker after updating to new Position model
-// import androidx.work.PeriodicWorkRequestBuilder
-// import androidx.work.WorkManager
-// import com.cryptotrader.workers.TradingWorker
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.cryptotrader.workers.TradingWorker
+import com.cryptotrader.data.dataimport.AutoDataSeeder
 import com.cryptotrader.workers.WorkScheduler
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
@@ -22,6 +22,9 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workScheduler: WorkScheduler
+
+    @Inject
+    lateinit var autoDataSeeder: AutoDataSeeder
 
     override fun onCreate() {
         super.onCreate()
@@ -38,6 +41,9 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
 
         // SECURITY: Perform security checks on startup
         performSecurityChecks()
+
+        // Auto-seed historical data if database is empty
+        autoDataSeeder.seedIfNeeded()
 
         // Start trading worker if API keys are configured
         startTradingWorkerIfConfigured()
@@ -93,37 +99,30 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
 
     /**
      * Start trading worker if API credentials are configured
-     * TODO: Re-enable after TradingWorker is updated to new Position model
      */
     private fun startTradingWorkerIfConfigured() {
-        // Temporarily disabled - TradingWorker needs update for new Position model
-        Timber.d("⏸️ Trading worker disabled - pending Position model update")
-        /*
         try {
-            // Check if API keys are set
+            // Check if API keys are set (or if paper trading mode is enabled)
             val hasApiKeys = com.cryptotrader.utils.CryptoUtils.hasApiCredentials(this)
+            val isPaperTrading = com.cryptotrader.utils.CryptoUtils.isPaperTradingMode(this)
 
-            if (hasApiKeys) {
+            if (hasApiKeys || isPaperTrading) {
                 scheduleTradingWorker()
-                Timber.i("✅ Trading worker scheduled (runs every 1 minute)")
+                val mode = if (isPaperTrading) "PAPER" else "LIVE"
+                Timber.i("✅ Trading worker scheduled (runs every 1 minute, mode: $mode)")
             } else {
-                Timber.d("⏸️ Trading worker not started - API keys not configured")
+                Timber.d("⏸️ Trading worker not started - API keys not configured and paper trading disabled")
             }
         } catch (e: Exception) {
             Timber.e(e, "Error checking API configuration")
         }
-        */
     }
 
     /**
      * Schedule periodic trading worker
      * Called when API keys are configured or when user starts trading
-     * TODO: Re-enable after TradingWorker is updated to new Position model
      */
     fun scheduleTradingWorker() {
-        // Temporarily disabled - TradingWorker needs update for new Position model
-        Timber.d("⏸️ Trading worker scheduling disabled - pending Position model update")
-        /*
         try {
             val tradingWorkRequest = PeriodicWorkRequestBuilder<TradingWorker>(
                 repeatInterval = 1, // Run every 1 minute
@@ -136,28 +135,29 @@ class CryptoTraderApplication : Application(), Configuration.Provider {
                 tradingWorkRequest
             )
 
-            Timber.i("🚀 Trading worker scheduled successfully")
+            // Also start OrderMonitor when trading is active
+            workScheduler.scheduleOrderMonitor(enabled = true)
+
+            Timber.i("🚀 Trading worker and OrderMonitor scheduled successfully")
         } catch (e: Exception) {
             Timber.e(e, "Failed to schedule trading worker")
         }
-        */
     }
 
     /**
      * Stop trading worker
-     * TODO: Re-enable after TradingWorker is updated to new Position model
      */
     fun stopTradingWorker() {
-        // Temporarily disabled - TradingWorker needs update for new Position model
-        Timber.d("⏸️ Trading worker stop disabled - pending Position model update")
-        /*
         try {
             WorkManager.getInstance(this).cancelUniqueWork("trading_worker")
-            Timber.i("⏹️ Trading worker stopped")
+
+            // Also stop OrderMonitor when trading stops
+            workScheduler.cancelOrderMonitor()
+
+            Timber.i("⏹️ Trading worker and OrderMonitor stopped")
         } catch (e: Exception) {
             Timber.e(e, "Failed to stop trading worker")
         }
-        */
     }
 
     /**

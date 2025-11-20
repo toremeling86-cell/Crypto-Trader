@@ -4,6 +4,7 @@ import com.cryptotrader.domain.backtesting.BacktestEngine
 import com.cryptotrader.domain.backtesting.BacktestResult
 import com.cryptotrader.domain.backtesting.PriceBar
 import com.cryptotrader.domain.model.Strategy
+import com.cryptotrader.utils.toBigDecimalMoney
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,10 +55,12 @@ class StrategyOptimizer @Inject constructor(
                         )
 
                         // Run backtest
-                        val backtestResult = backtestEngine.runBacktest(
+                        val resultDecimal = backtestEngine.runBacktestDecimal(
                             strategy = testStrategy,
-                            historicalData = historicalData
+                            historicalData = historicalData,
+                            startingBalance = 10000.0.toBigDecimalMoney()
                         )
+                        val backtestResult = resultDecimal.toBacktestResult()
 
                         // Calculate fitness score
                         val fitnessScore = calculateFitnessScore(backtestResult)
@@ -102,7 +105,8 @@ class StrategyOptimizer @Inject constructor(
         )
 
         // Calculate improvement
-        val originalBacktest = backtestEngine.runBacktest(baseStrategy, historicalData)
+        val originalResultDecimal = backtestEngine.runBacktestDecimal(baseStrategy, historicalData, 10000.0.toBigDecimalMoney())
+        val originalBacktest = originalResultDecimal.toBacktestResult()
         val originalScore = calculateFitnessScore(originalBacktest)
         val improvement = ((bestResult.fitnessScore - originalScore) / originalScore) * 100.0
 

@@ -8,6 +8,7 @@ import com.cryptotrader.domain.backtesting.BacktestResult
 import com.cryptotrader.domain.backtesting.PriceBar
 import com.cryptotrader.domain.backtesting.TradingCostModel
 import com.cryptotrader.domain.model.Strategy
+import com.cryptotrader.utils.toBigDecimalMoney
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,11 +48,16 @@ data class StrategyTestCenterUiState(
 class StrategyTestCenterViewModel @Inject constructor(
     private val strategyRepository: StrategyRepository,
     private val backtestEngine: BacktestEngine,
-    private val marketDataRepository: com.cryptotrader.data.repository.MarketDataRepository
+    private val marketDataRepository: com.cryptotrader.data.repository.MarketDataRepository,
+    private val datasetManager: com.cryptotrader.domain.data.DatasetManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StrategyTestCenterUiState())
     val uiState: StateFlow<StrategyTestCenterUiState> = _uiState.asStateFlow()
+
+    // Expose dataset manager state
+    val availableDatasets = datasetManager.availableDatasets
+    val activeDataset = datasetManager.activeDataset
 
     init {
         loadStrategies()
@@ -128,12 +134,15 @@ class StrategyTestCenterViewModel @Inject constructor(
 
                 // Run backtest (temporarily set strategy as active for testing)
                 val testStrategy = strategy.copy(isActive = true)
-                val result = backtestEngine.runBacktest(
+                val resultDecimal = backtestEngine.runBacktestDecimal(
                     strategy = testStrategy,
                     historicalData = historicalData,
-                    startingBalance = config.startingBalance,
-                    costModel = costModel
+                    startingBalance = config.startingBalance.toBigDecimalMoney(),
+                    costModel = costModel,
+                    ohlcBars = null // Skip tier validation for manual test
                 )
+                
+                val result = resultDecimal.toBacktestResult()
 
                 _uiState.value = _uiState.value.copy(
                     backtestResult = result,
@@ -154,5 +163,19 @@ class StrategyTestCenterViewModel @Inject constructor(
 
     fun updateConfig(config: BacktestConfig) {
         _uiState.value = _uiState.value.copy(backtestConfig = config)
+    }
+
+    fun activateDataset(datasetId: String) {
+        viewModelScope.launch {
+            try {
+                datasetManager.activateDataset(datasetId)
+                Timber.i("Activated dataset: $datasetId")
+            } catch (e: Exception) {
+                Timber.e(e, "Error activating dataset")
+                _uiState.value = _uiState.value.copy(
+                    error = "Failed to activate dataset: ${e.message}"
+                )
+            }
+        }
     }
 }

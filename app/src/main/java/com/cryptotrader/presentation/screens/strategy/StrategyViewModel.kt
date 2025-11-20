@@ -297,6 +297,27 @@ class StrategyViewModel @Inject constructor(
                     return@launch
                 }
 
+                // Safety check for Live Mode
+                if (mode == com.cryptotrader.domain.model.TradingMode.LIVE) {
+                    // Check if user has accepted risk disclaimer
+                    val hasAcceptedRisk = com.cryptotrader.utils.CryptoUtils.hasAcceptedRiskDisclaimer(application)
+                    if (!hasAcceptedRisk) {
+                        _uiState.value = _uiState.value.copy(
+                            errorMessage = "⚠️ You must accept the Risk Disclaimer in Settings before enabling Live Trading."
+                        )
+                        return@launch
+                    }
+
+                    // TODO: Check if strategy has been backtested successfully
+                    // (backtestStatus field not yet added to Strategy model)
+                    // if (strategy.backtestStatus == com.cryptotrader.domain.model.BacktestStatus.FAILED) {
+                    //      _uiState.value = _uiState.value.copy(
+                    //         errorMessage = "⚠️ Cannot enable Live Trading: This strategy FAILED backtesting."
+                    //     )
+                    //     return@launch
+                    // }
+                }
+
                 // Update strategy with new trading mode
                 val updatedStrategy = strategy.copy(
                     tradingMode = mode,

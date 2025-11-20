@@ -81,6 +81,12 @@ interface OHLCBarDao {
     suspend fun getBarCount(asset: String, timeframe: String): Long
 
     /**
+     * Get total count of all bars (for database health check)
+     */
+    @Query("SELECT COUNT(*) FROM ohlc_bars")
+    suspend fun getBarCount(): Long
+
+    /**
      * Get earliest and latest timestamps
      */
     @Query("""

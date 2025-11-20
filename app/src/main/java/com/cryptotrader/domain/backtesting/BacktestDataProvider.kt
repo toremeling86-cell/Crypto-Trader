@@ -8,6 +8,7 @@ import com.cryptotrader.domain.model.Strategy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import com.cryptotrader.domain.data.DatasetManager
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +26,8 @@ import javax.inject.Singleton
 @Singleton
 class BacktestDataProvider @Inject constructor(
     private val ohlcBarDao: OHLCBarDao,
-    private val dataCoverageDao: DataCoverageDao
+    private val dataCoverageDao: DataCoverageDao,
+    private val datasetManager: DatasetManager
 ) {
 
     /**
@@ -55,16 +57,24 @@ class BacktestDataProvider @Inject constructor(
             Timber.i("Strategy: ${strategy.name}")
             Timber.i("Trading Pairs: ${strategy.tradingPairs.joinToString(", ")}")
 
+            // Step 0: Check for active managed dataset
+            val activeDataset = datasetManager.activeDataset.value
+            
             // Step 1: Select data tier
-            val dataTier = preferredTier ?: selectDataTierForStrategy(strategy)
+            val dataTier = if (activeDataset != null) {
+                Timber.i("📂 Using Active Dataset: ${activeDataset.name} (${activeDataset.dataTier})")
+                activeDataset.dataTier
+            } else {
+                preferredTier ?: selectDataTierForStrategy(strategy)
+            }
             Timber.i("Selected Data Tier: ${dataTier.tierName}")
 
-            // Step 2: Select asset (first trading pair for now)
-            val asset = strategy.tradingPairs.firstOrNull() ?: "XXBTZUSD"
+            // Step 2: Select asset
+            val asset = activeDataset?.asset ?: strategy.tradingPairs.firstOrNull() ?: "XXBTZUSD"
             Timber.i("Selected Asset: $asset")
 
             // Step 3: Select timeframe
-            val timeframe = selectTimeframeForStrategy(strategy)
+            val timeframe = activeDataset?.timeframe ?: selectTimeframeForStrategy(strategy)
             Timber.i("Selected Timeframe: $timeframe")
 
             // Step 4: Check data coverage
@@ -80,8 +90,8 @@ class BacktestDataProvider @Inject constructor(
             Timber.i("Total Bars: ${coverage.totalBars}, Quality: ${String.format("%.1f%%", coverage.dataQualityScore * 100)}")
 
             // Step 5: Determine date range
-            val actualStartDate = startDate ?: coverage.earliestTimestamp
-            val actualEndDate = endDate ?: coverage.latestTimestamp
+            val actualStartDate = startDate ?: activeDataset?.startDate ?: coverage.earliestTimestamp
+            val actualEndDate = endDate ?: activeDataset?.endDate ?: coverage.latestTimestamp
 
             Timber.i("Backtest Period: ${formatTimestamp(actualStartDate)} → ${formatTimestamp(actualEndDate)}")
 

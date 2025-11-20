@@ -9,9 +9,8 @@ import com.cryptotrader.data.repository.AIAdvisorRepository
 import com.cryptotrader.data.repository.AIAdvisorRepositoryImpl
 import com.cryptotrader.data.repository.CryptoReportRepository
 import com.cryptotrader.data.repository.CryptoReportRepositoryImpl
-// TEMPORARILY DISABLED - Learning section
-// import com.cryptotrader.data.repository.MetaAnalysisRepository
-// import com.cryptotrader.data.repository.MetaAnalysisRepositoryImpl
+import com.cryptotrader.data.repository.MetaAnalysisRepository
+import com.cryptotrader.data.repository.MetaAnalysisRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -47,12 +46,9 @@ abstract class RepositoryModule {
         impl: CryptoReportRepositoryImpl
     ): CryptoReportRepository
 
-    // TEMPORARILY DISABLED - Learning section
-    /*
     @Binds
     @Singleton
     abstract fun bindMetaAnalysisRepository(
         impl: MetaAnalysisRepositoryImpl
     ): MetaAnalysisRepository
-    */
 }

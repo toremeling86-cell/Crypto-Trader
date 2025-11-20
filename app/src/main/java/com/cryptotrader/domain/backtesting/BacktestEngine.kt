@@ -1555,4 +1555,58 @@ data class BacktestResultDecimal(
     val validationError: String? = null, // Data validation error (if any)
     val dataTier: DataTier? = null, // Data quality tier used (PREMIUM/PROFESSIONAL/STANDARD/BASIC)
     val dataQualityScore: Double? = null // Measured data quality score (0.0 - 1.0)
-)
+) {
+    /**
+     * Convert to legacy BacktestResult for backward compatibility
+     *
+     * NOTE: This conversion loses precision by converting BigDecimal back to Double.
+     * This is only for compatibility with legacy code that hasn't been migrated yet.
+     */
+    fun toBacktestResult(): BacktestResult {
+        return BacktestResult(
+            strategyId = strategyId,
+            strategyName = strategyName,
+            startingBalance = startingBalanceDecimal.toDouble(),
+            endingBalance = endingBalanceDecimal.toDouble(),
+            totalTrades = totalTrades,
+            winningTrades = winningTrades,
+            losingTrades = losingTrades,
+            winRate = winRateDecimal.toDouble(),
+            totalPnL = totalPnLDecimal.toDouble(),
+            totalPnLPercent = totalPnLPercentDecimal.toDouble(),
+            maxDrawdown = maxDrawdownPercentDecimal.toDouble(),
+            sharpeRatio = sharpeRatioDecimal.toDouble(),
+            profitFactor = profitFactorDecimal.toDouble(),
+            averageProfit = averageProfitDecimal.toDouble(),
+            averageLoss = averageLossDecimal.toDouble(),
+            bestTrade = bestTradeDecimal.toDouble(),
+            worstTrade = worstTradeDecimal.toDouble(),
+            trades = trades.map { it.toBacktestTrade() },
+            equityCurve = equityCurveDecimal.map { it.second.toDouble() }, // Extract only values (lose timestamps)
+            totalFees = totalFeesDecimal.toDouble(),
+            totalSlippage = 0.0, // Not tracked separately in new version
+            totalSpreadCost = 0.0, // Not tracked separately in new version
+            validationError = validationError,
+            dataTier = dataTier,
+            dataQualityScore = dataQualityScore
+        )
+    }
+}
+
+/**
+ * Extension function to convert BacktestTradeDecimal to legacy BacktestTrade
+ */
+private fun BacktestTradeDecimal.toBacktestTrade(): BacktestTrade {
+    return BacktestTrade(
+        timestamp = timestamp,
+        pair = pair,
+        type = type,
+        entryPrice = entryPriceDecimal.toDouble(),
+        exitPrice = exitPriceDecimal.toDouble(),
+        volume = volumeDecimal.toDouble(),
+        pnl = pnlDecimal.toDouble(),
+        entryCost = entryCostDecimal.toDouble(),
+        exitCost = exitCostDecimal.toDouble(),
+        reason = reason
+    )
+}

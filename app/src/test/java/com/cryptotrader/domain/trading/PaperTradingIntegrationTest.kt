@@ -181,7 +181,12 @@ class PaperTradingIntegrationTest {
             totalValue = 10000.0,
             availableBalance = 10000.0,
             balances = mapOf(
-                "ZUSD" to AssetBalance("ZUSD", 10000.0, 10000.0, 100.0)
+                "ZUSD" to AssetBalance(
+                    asset = "ZUSD",
+                    balance = 10000.0,
+                    valueInUSD = 10000.0,
+                    percentOfPortfolio = 100.0
+                )
             ),
             totalProfit = 0.0,
             totalProfitPercent = 0.0,

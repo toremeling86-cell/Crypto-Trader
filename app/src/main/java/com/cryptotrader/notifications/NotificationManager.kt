@@ -497,6 +497,86 @@ class NotificationManager @Inject constructor(
     }
 
     /**
+     * Send notification for order filled
+     */
+    fun notifyOrderFilled(pair: String, type: String, quantity: Double, price: Double) {
+        if (!hasNotificationPermission()) return
+
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val title = "✅ Order Filled: $type $pair"
+            val message = String.format(
+                "%.4f %s @ $%.2f",
+                quantity,
+                pair,
+                price
+            )
+
+            val notification = NotificationCompat.Builder(context, CHANNEL_TRADES)
+                .setSmallIcon(R.drawable.ic_notification_trade_buy)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .build()
+
+            NotificationManagerCompat.from(context).notify(
+                NOTIFICATION_ID_TRADE + System.currentTimeMillis().toInt(),
+                notification
+            )
+
+            Timber.d("Sent order filled notification: $title")
+        } catch (e: Exception) {
+            Timber.e(e, "Error sending order filled notification")
+        }
+    }
+
+    /**
+     * Send notification for trading worker failure
+     */
+    fun notifyTradingWorkerFailed(errorMessage: String) {
+        if (!hasNotificationPermission()) return
+
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
+                .setSmallIcon(R.drawable.ic_notification_stop_loss)
+                .setContentTitle("⚠️ Trading Worker Failed")
+                .setContentText("Automated trading has stopped after 3 failed attempts: $errorMessage")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setCategory(NotificationCompat.CATEGORY_ERROR)
+                .build()
+
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_ALERT + 5, notification)
+
+            Timber.w("Sent trading worker failure notification")
+        } catch (e: Exception) {
+            Timber.e(e, "Error sending trading worker failure notification")
+        }
+    }
+
+    /**
      * Format price based on magnitude for better readability
      */
     private fun formatPrice(price: Double): String {

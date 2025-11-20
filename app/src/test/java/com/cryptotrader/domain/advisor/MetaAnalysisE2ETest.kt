@@ -2,6 +2,8 @@ package com.cryptotrader.domain.advisor
 
 import com.cryptotrader.data.local.entities.*
 import com.cryptotrader.domain.model.*
+import com.cryptotrader.domain.model.RiskLevel
+import com.cryptotrader.domain.model.StrategySource
 import org.junit.Before
 import org.junit.Test
 import org.junit.Assert.*

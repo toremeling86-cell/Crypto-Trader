@@ -75,6 +75,8 @@ class DashboardViewModel @Inject constructor(
 
                 // Check if API credentials are configured (only in non-paper-trading mode)
                 val isPaperTrading = com.cryptotrader.utils.CryptoUtils.isPaperTradingMode(context)
+                _uiState.value = _uiState.value.copy(isPaperTrading = isPaperTrading)
+
                 if (!isPaperTrading) {
                     val hasApiKeys = com.cryptotrader.utils.CryptoUtils.hasApiCredentials(context)
                     if (!hasApiKeys) {
@@ -456,6 +458,36 @@ class DashboardViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Toggle Paper Trading Mode
+     */
+    fun setPaperTradingMode(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                com.cryptotrader.utils.CryptoUtils.setPaperTradingMode(context, enabled)
+                
+                // Update state
+                _uiState.value = _uiState.value.copy(
+                    isPaperTrading = enabled,
+                    errorMessage = if (enabled) 
+                        "Switched to Paper Trading Mode (Simulated)" 
+                    else 
+                        "⚠️ Switched to LIVE TRADING MODE (Real Money)"
+                )
+                
+                // Reload data to reflect mode change (different portfolios)
+                loadDashboardData()
+                
+                Timber.i("Trading mode switched: ${if (enabled) "PAPER" else "LIVE"}")
+            } catch (e: Exception) {
+                Timber.e(e, "Error switching trading mode")
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Failed to switch trading mode: ${e.message}"
+                )
+            }
+        }
+    }
 }
 
 data class DashboardState(
@@ -463,5 +495,6 @@ data class DashboardState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val priceHistoryStatus: Map<String, Pair<Int, Int>> = emptyMap(), // pair -> (current, required)
-    val isTradingActive: Boolean = false
+    val isTradingActive: Boolean = false,
+    val isPaperTrading: Boolean = true
 )

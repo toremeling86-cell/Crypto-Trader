@@ -43,6 +43,23 @@ fun StrategyConfigScreen(
         )
     }
 
+    // Live Mode Confirmation Dialog for Trading Mode Selector
+    var liveModeConfirmationStrategyId by remember { mutableStateOf<String?>(null) }
+
+    liveModeConfirmationStrategyId?.let { strategyId ->
+        val strategy = strategies.find { it.id == strategyId }
+        if (strategy != null) {
+            ConfirmLiveModeDialog(
+                strategy = strategy,
+                onConfirm = {
+                    viewModel.setTradingMode(strategyId, com.cryptotrader.domain.model.TradingMode.LIVE)
+                    liveModeConfirmationStrategyId = null
+                },
+                onDismiss = { liveModeConfirmationStrategyId = null }
+            )
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -136,7 +153,13 @@ fun StrategyConfigScreen(
                         performance = performances[strategy.id],
                         onToggle = { viewModel.toggleStrategy(strategy.id, !strategy.isActive) },
                         onDelete = { viewModel.deleteStrategy(strategy) },
-                        onSetTradingMode = { mode -> viewModel.setTradingMode(strategy.id, mode) }
+                        onSetTradingMode = { mode ->
+                            if (mode == com.cryptotrader.domain.model.TradingMode.LIVE) {
+                                liveModeConfirmationStrategyId = strategy.id
+                            } else {
+                                viewModel.setTradingMode(strategy.id, mode)
+                            }
+                        }
                     )
                 }
             }
@@ -642,4 +665,57 @@ fun TradingModeButton(
             )
         }
     }
+}
+
+@Composable
+fun ConfirmLiveModeDialog(
+    strategy: com.cryptotrader.domain.model.Strategy,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text("Enable Live Trading?", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        },
+        text = {
+            Column {
+                Text(
+                    text = "You are about to enable LIVE TRADING for strategy '${strategy.name}'.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "• Real funds will be used for trades\n" +
+                            "• Ensure you have sufficient balance\n" +
+                            "• Monitor the strategy performance closely",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Enable Live Trading")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
