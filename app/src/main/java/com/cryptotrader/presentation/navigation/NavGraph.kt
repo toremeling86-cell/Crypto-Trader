@@ -20,6 +20,7 @@ import com.cryptotrader.presentation.screens.history.TradingHistoryScreen
 import com.cryptotrader.presentation.screens.analytics.PerformanceScreen
 import com.cryptotrader.presentation.screens.chat.ChatScreen
 import com.cryptotrader.presentation.screens.strategy.CreateStrategyScreen
+import com.cryptotrader.presentation.screens.strategy.StrategyScreen
 import com.cryptotrader.presentation.screens.settings.SettingsScreen
 import com.cryptotrader.presentation.screens.setup.ApiKeySetupScreen
 // TEMPORARILY DISABLED - Learning section has compilation errors
@@ -107,6 +108,10 @@ fun NavGraph(
 
         composable(Screen.Portfolio.route) {
             PortfolioScreen()
+        }
+
+        composable(Screen.Strategy.route) {
+            StrategyScreen()
         }
 
         composable(Screen.Reports.route) {

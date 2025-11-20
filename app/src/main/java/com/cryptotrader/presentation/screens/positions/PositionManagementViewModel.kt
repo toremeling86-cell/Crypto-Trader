@@ -13,11 +13,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PositionManagementViewModel @Inject constructor(
-    private val positionRepository: PositionRepository
+    private val positionRepository: PositionRepository,
+    private val focusModeManager: com.cryptotrader.utils.FocusModeManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PositionManagementState())
     val uiState: StateFlow<PositionManagementState> = _uiState.asStateFlow()
+
+    // Expose Focus Mode state
+    val focusModeEnabled = focusModeManager.focusModeEnabled
 
     // Filters
     private val _filterStatus = MutableStateFlow<PositionFilter>(PositionFilter.OPEN)

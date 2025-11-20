@@ -1,6 +1,7 @@
 package com.cryptotrader.di
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.cryptotrader.data.local.AppDatabase
 import com.cryptotrader.data.local.dao.ApiKeyDao
 import com.cryptotrader.data.local.dao.StrategyDao
@@ -30,6 +31,12 @@ object AppModule {
     fun provideApplicationContext(
         @ApplicationContext context: Context
     ): Context = context
+
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(
+        @ApplicationContext context: Context
+    ): SharedPreferences = context.getSharedPreferences("crypto_trader_prefs", Context.MODE_PRIVATE)
 }
 
 @Module

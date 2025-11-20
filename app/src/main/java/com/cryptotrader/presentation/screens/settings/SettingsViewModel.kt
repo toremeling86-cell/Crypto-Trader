@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.cryptotrader.CryptoTraderApplication
 import com.cryptotrader.data.repository.KrakenRepository
 import com.cryptotrader.utils.CryptoUtils
+import com.cryptotrader.utils.FocusModeManager
+import com.cryptotrader.utils.HapticFeedbackManager
+import com.cryptotrader.utils.ThemeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +23,10 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val krakenRepository: KrakenRepository,
-    private val application: Application
+    private val application: Application,
+    private val focusModeManager: FocusModeManager,
+    private val hapticFeedbackManager: HapticFeedbackManager,
+    private val themeManager: ThemeManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsState())
@@ -50,12 +56,25 @@ class SettingsViewModel @Inject constructor(
                     maskClaudeApiKey(claudeKey)
                 } else ""
 
+                // Load manager states
+                val focusModeEnabled = focusModeManager.isEnabled()
+                val hapticEnabled = hapticFeedbackManager.isEnabled()
+                val hapticIntensity = hapticFeedbackManager.getIntensity()
+                val currentTheme = themeManager.getCurrentTheme()
+                val (marketStart, marketEnd) = themeManager.getMarketHours()
+
                 _uiState.value = _uiState.value.copy(
                     isPaperTradingMode = isPaperMode,
                     hasApiKeys = hasApiKeys,
                     maskedApiKey = apiKey,
                     hasClaudeApiKey = hasClaudeKey,
                     maskedClaudeApiKey = maskedClaudeKey,
+                    focusModeEnabled = focusModeEnabled,
+                    hapticFeedbackEnabled = hapticEnabled,
+                    hapticIntensity = hapticIntensity,
+                    currentTheme = currentTheme,
+                    marketHoursStart = marketStart,
+                    marketHoursEnd = marketEnd,
                     isLoading = false
                 )
             } catch (e: Exception) {
@@ -332,6 +351,69 @@ class SettingsViewModel @Inject constructor(
             editClaudeApiKey = ""
         )
     }
+
+    // Focus Mode Management
+    fun onFocusModeToggled(enabled: Boolean) {
+        focusModeManager.setFocusMode(enabled)
+        _uiState.value = _uiState.value.copy(
+            focusModeEnabled = enabled,
+            successMessage = if (enabled) {
+                "Focus Mode enabled - Dollar amounts hidden"
+            } else {
+                "Focus Mode disabled - Dollar amounts visible"
+            }
+        )
+        // Trigger haptic feedback for user confirmation
+        if (enabled) hapticFeedbackManager.success() else hapticFeedbackManager.buttonPress()
+    }
+
+    // Haptic Feedback Management
+    fun onHapticFeedbackToggled(enabled: Boolean) {
+        hapticFeedbackManager.setEnabled(enabled)
+        _uiState.value = _uiState.value.copy(
+            hapticFeedbackEnabled = enabled,
+            successMessage = if (enabled) {
+                "Haptic feedback enabled"
+            } else {
+                "Haptic feedback disabled"
+            }
+        )
+        // Test haptic if enabling
+        if (enabled) hapticFeedbackManager.success()
+    }
+
+    fun onHapticIntensityChanged(intensity: HapticFeedbackManager.HapticIntensity) {
+        hapticFeedbackManager.setIntensity(intensity)
+        _uiState.value = _uiState.value.copy(
+            hapticIntensity = intensity
+        )
+        // Test the new intensity
+        hapticFeedbackManager.buttonPress()
+    }
+
+    // Theme Management
+    fun onThemeChanged(theme: ThemeManager.Theme) {
+        themeManager.setTheme(theme)
+        _uiState.value = _uiState.value.copy(
+            currentTheme = theme,
+            successMessage = "Theme changed to ${theme.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }}"
+        )
+    }
+
+    fun onMarketHoursChanged(startHour: Int, endHour: Int) {
+        themeManager.setMarketHours(startHour, endHour)
+        _uiState.value = _uiState.value.copy(
+            marketHoursStart = startHour,
+            marketHoursEnd = endHour,
+            successMessage = "Market hours updated: ${startHour}:00 - ${endHour}:00"
+        )
+    }
+
+    fun onShowMarketHoursDialogChanged(show: Boolean) {
+        _uiState.value = _uiState.value.copy(
+            showMarketHoursDialog = show
+        )
+    }
 }
 
 data class SettingsState(
@@ -359,5 +441,18 @@ data class SettingsState(
 
     // Logout dialog
     val showLogoutConfirmDialog: Boolean = false,
-    val logoutComplete: Boolean = false
+    val logoutComplete: Boolean = false,
+
+    // Focus Mode
+    val focusModeEnabled: Boolean = false,
+
+    // Haptic Feedback
+    val hapticFeedbackEnabled: Boolean = true,
+    val hapticIntensity: HapticFeedbackManager.HapticIntensity = HapticFeedbackManager.HapticIntensity.MEDIUM,
+
+    // Theme
+    val currentTheme: ThemeManager.Theme = ThemeManager.Theme.AUTO,
+    val marketHoursStart: Int = 8,
+    val marketHoursEnd: Int = 22,
+    val showMarketHoursDialog: Boolean = false
 )

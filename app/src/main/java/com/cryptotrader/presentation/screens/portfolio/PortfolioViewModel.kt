@@ -25,8 +25,12 @@ class PortfolioViewModel @Inject constructor(
     private val tradeDao: TradeDao,
     private val analyticsEngine: PortfolioAnalyticsEngine,
     private val riskEngine: RiskAnalyticsEngine,
-    private val performanceCalculator: PerformanceCalculator
+    private val performanceCalculator: PerformanceCalculator,
+    private val focusModeManager: com.cryptotrader.utils.FocusModeManager
 ) : ViewModel() {
+
+    // Expose Focus Mode state
+    val focusModeEnabled = focusModeManager.focusModeEnabled
 
     // Holdings State
     private val _holdingsState = MutableStateFlow(HoldingsState())

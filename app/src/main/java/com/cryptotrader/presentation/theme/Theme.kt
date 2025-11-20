@@ -6,10 +6,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.cryptotrader.utils.ThemeManager
 
 private val DarkColorScheme = darkColorScheme(
     primary = CryptoBlue80,
@@ -79,9 +84,33 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun CryptoTraderTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeManager: ThemeManager? = null,
     content: @Composable () -> Unit
 ) {
+    // Get system dark theme state
+    val isSystemDark = isSystemInDarkTheme()
+
+    // Determine if we should use dark theme based on ThemeManager settings
+    val darkTheme = if (themeManager != null) {
+        // Collect theme to trigger recomposition when it changes
+        val theme by themeManager.theme.collectAsState()
+        // Use the collected theme value to calculate dark mode
+        when (theme) {
+            ThemeManager.Theme.LIGHT -> false
+            ThemeManager.Theme.DARK -> true
+            ThemeManager.Theme.AUTO -> isSystemDark
+            ThemeManager.Theme.AUTO_MARKET_HOURS -> {
+                if (themeManager.isWithinMarketHours()) {
+                    true // Always dark during market hours
+                } else {
+                    isSystemDark // Follow system outside market hours
+                }
+            }
+        }
+    } else {
+        isSystemDark
+    }
+
     val colorScheme = when {
         darkTheme -> DarkColorScheme
         else -> LightColorScheme

@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Description
@@ -24,15 +25,21 @@ import com.cryptotrader.presentation.navigation.NavGraph
 import com.cryptotrader.presentation.navigation.Screen
 import com.cryptotrader.presentation.theme.CryptoTraderTheme
 import com.cryptotrader.utils.CryptoUtils
+import com.cryptotrader.utils.ThemeManager
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var themeManager: ThemeManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            CryptoTraderTheme {
+            CryptoTraderTheme(themeManager = themeManager) {
                 CryptoTraderApp()
             }
         }

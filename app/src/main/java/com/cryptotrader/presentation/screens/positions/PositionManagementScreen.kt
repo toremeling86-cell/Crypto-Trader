@@ -31,6 +31,7 @@ fun PositionManagementScreen(
     val state by viewModel.uiState.collectAsState()
     val positions by viewModel.positions.collectAsState()
     val currentFilter by viewModel.currentFilter.collectAsState() // Collect current filter
+    val focusModeEnabled by viewModel.focusModeEnabled.collectAsState() // Collect focus mode state
     var showFilterSheet by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -158,7 +159,8 @@ fun PositionManagementScreen(
                         items(positions) { position ->
                             PositionCard(
                                 position = position,
-                                onClose = { 
+                                focusModeEnabled = focusModeEnabled,
+                                onClose = {
                                     // Calculate approximate current price for closing
                                     // In a real scenario, the backend/repo handles the market order price
                                     val currentPrice = if (position.side == PositionSide.LONG) {
@@ -166,7 +168,7 @@ fun PositionManagementScreen(
                                     } else {
                                         position.entryPrice - (position.unrealizedPnL / position.quantity)
                                     }
-                                    viewModel.closePosition(position.id, currentPrice) 
+                                    viewModel.closePosition(position.id, currentPrice)
                                 }
                             )
                         }
@@ -180,6 +182,7 @@ fun PositionManagementScreen(
 @Composable
 fun PositionCard(
     position: Position,
+    focusModeEnabled: Boolean,
     onClose: () -> Unit
 ) {
     val isClosed = position.status == PositionStatus.CLOSED || position.status == PositionStatus.LIQUIDATED
@@ -235,7 +238,10 @@ fun PositionCard(
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = "${if (isProfit) "+" else ""}${pnl.formatCurrency()} (${String.format("%.2f", pnlPercent)}%)",
+                        text = if (focusModeEnabled)
+                            "${String.format("%.2f", pnlPercent)}%"
+                        else
+                            "${if (isProfit) "+" else ""}${pnl.formatCurrency()} (${String.format("%.2f", pnlPercent)}%)",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         color = if (isProfit) Color(0xFF4CAF50) else Color(0xFFE57373),
                         fontWeight = FontWeight.Bold
@@ -256,11 +262,17 @@ fun PositionCard(
                 }
                 Column {
                     Text("Entry", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(position.entryPrice.formatCurrency(), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (focusModeEnabled) "••••••" else position.entryPrice.formatCurrency(),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(if (isClosed) "Exit" else "Current", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(currentPrice.formatCurrency(), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (focusModeEnabled) "••••••" else currentPrice.formatCurrency(),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.cryptotrader.presentation.screens.ai.StrategyTestCenterScreen
 import com.cryptotrader.presentation.screens.chat.ChatScreen
 import com.cryptotrader.presentation.screens.reports.ReportsScreen

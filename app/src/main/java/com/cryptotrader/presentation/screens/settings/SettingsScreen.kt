@@ -9,6 +9,9 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cryptotrader.BuildConfig
 import com.cryptotrader.presentation.components.TradingModeBanner
+import com.cryptotrader.utils.FocusModeManager
+import com.cryptotrader.utils.HapticFeedbackManager
+import com.cryptotrader.utils.ThemeManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -294,6 +300,201 @@ fun SettingsScreen(
                 }
             }
 
+            // Focus Mode Section
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Focus Mode",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Text(
+                        text = "Hide dollar amounts to reduce emotional trading decisions. " +
+                                "Only percentage changes will be visible.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Enable Focus Mode",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = if (state.focusModeEnabled) {
+                                    "✓ Dollar amounts hidden"
+                                } else {
+                                    "Dollar amounts visible"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (state.focusModeEnabled) {
+                                    Color(0xFF4CAF50)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                        Switch(
+                            checked = state.focusModeEnabled,
+                            onCheckedChange = viewModel::onFocusModeToggled
+                        )
+                    }
+                }
+            }
+
+            // Haptic Feedback Section
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Vibration,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Haptic Feedback",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Text(
+                        text = "Tactile confirmation for trading events (trades executed, stop loss/take profit hit, errors)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Enable Haptic Feedback",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Switch(
+                            checked = state.hapticFeedbackEnabled,
+                            onCheckedChange = viewModel::onHapticFeedbackToggled
+                        )
+                    }
+
+                    if (state.hapticFeedbackEnabled) {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "Intensity: ${state.hapticIntensity.name}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            HapticFeedbackManager.HapticIntensity.values().forEach { intensity ->
+                                FilterChip(
+                                    selected = state.hapticIntensity == intensity,
+                                    onClick = { viewModel.onHapticIntensityChanged(intensity) },
+                                    label = { Text(intensity.name) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Theme Section
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Theme",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Text(
+                        text = "Customize app appearance",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ThemeManager.Theme.values().forEach { theme ->
+                            FilterChip(
+                                selected = state.currentTheme == theme,
+                                onClick = { viewModel.onThemeChanged(theme) },
+                                label = {
+                                    Text(
+                                        text = theme.name.replace("_", " "),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    if (state.currentTheme == ThemeManager.Theme.AUTO_MARKET_HOURS) {
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = { viewModel.onShowMarketHoursDialogChanged(true) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Configure Market Hours (${state.marketHoursStart}:00 - ${state.marketHoursEnd}:00)")
+                        }
+                    }
+                }
+            }
+
             // App Info Section
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -536,6 +737,78 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = viewModel::dismissClaudeApiKeyDialog) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Market Hours Dialog
+    if (state.showMarketHoursDialog) {
+        var startHour by remember { mutableStateOf(state.marketHoursStart) }
+        var endHour by remember { mutableStateOf(state.marketHoursEnd) }
+
+        AlertDialog(
+            onDismissRequest = { viewModel.onShowMarketHoursDialogChanged(false) },
+            icon = { Icon(imageVector = Icons.Default.Palette, contentDescription = null) },
+            title = { Text("Configure Market Hours") },
+            text = {
+                Column {
+                    Text(
+                        text = "Set your active trading hours. During these hours, the app will use dark mode to reduce eye strain.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Text(
+                        text = "Start Hour: ${startHour}:00",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Slider(
+                        value = startHour.toFloat(),
+                        onValueChange = { startHour = it.toInt() },
+                        valueRange = 0f..23f,
+                        steps = 22
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "End Hour: ${endHour}:00",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Slider(
+                        value = endHour.toFloat(),
+                        onValueChange = { endHour = it.toInt() },
+                        valueRange = 0f..23f,
+                        steps = 22
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Active hours: ${startHour}:00 - ${endHour}:00",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF4CAF50),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.onMarketHoursChanged(startHour, endHour)
+                        viewModel.onShowMarketHoursDialogChanged(false)
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onShowMarketHoursDialogChanged(false) }) {
                     Text("Cancel")
                 }
             }

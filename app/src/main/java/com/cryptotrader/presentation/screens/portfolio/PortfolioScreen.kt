@@ -21,7 +21,15 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Main Portfolio Screen with 5 tabs
+ * Main Portfolio Screen with 6 tabs
+ *
+ * Tabs:
+ * 1. Overview - Portfolio summary
+ * 2. Positions - Active positions (moved from standalone screen)
+ * 3. Performance - Charts and ROI
+ * 4. Activity - Trade history
+ * 5. Analytics - Advanced metrics
+ * 6. Risk - Risk analysis
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +43,7 @@ fun PortfolioScreen(
     val activityState by viewModel.activityState.collectAsState()
     val analyticsState by viewModel.analyticsState.collectAsState()
     val riskState by viewModel.riskState.collectAsState()
+    val focusModeEnabled by viewModel.focusModeEnabled.collectAsState()
 
     Scaffold(
         topBar = {
@@ -60,37 +69,43 @@ fun PortfolioScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Holdings", maxLines = 1) }
+                    text = { Text("Overview", maxLines = 1) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Performance", maxLines = 1) }
+                    text = { Text("Positions", maxLines = 1) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("Activity", maxLines = 1) }
+                    text = { Text("Performance", maxLines = 1) }
                 )
                 Tab(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
-                    text = { Text("Analytics", maxLines = 1) }
+                    text = { Text("Activity", maxLines = 1) }
                 )
                 Tab(
                     selected = selectedTab == 4,
                     onClick = { selectedTab = 4 },
+                    text = { Text("Analytics", maxLines = 1) }
+                )
+                Tab(
+                    selected = selectedTab == 5,
+                    onClick = { selectedTab = 5 },
                     text = { Text("Risk", maxLines = 1) }
                 )
             }
 
             // Tab content
             when (selectedTab) {
-                0 -> HoldingsTab(holdingsState)
-                1 -> PerformanceTab(performanceState, viewModel)
-                2 -> ActivityTab(activityState, viewModel)
-                3 -> AnalyticsTab(analyticsState)
-                4 -> RiskTab(riskState)
+                0 -> HoldingsTab(holdingsState, focusModeEnabled) // Renamed to Overview conceptually
+                1 -> PositionsTab() // NEW: Active positions
+                2 -> PerformanceTab(performanceState, viewModel, focusModeEnabled)
+                3 -> ActivityTab(activityState, viewModel)
+                4 -> AnalyticsTab(analyticsState, focusModeEnabled)
+                5 -> RiskTab(riskState)
             }
         }
     }
@@ -100,7 +115,7 @@ fun PortfolioScreen(
  * Holdings Tab - Shows current portfolio holdings
  */
 @Composable
-fun HoldingsTab(state: HoldingsState) {
+fun HoldingsTab(state: HoldingsState, focusModeEnabled: Boolean) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -124,7 +139,7 @@ fun HoldingsTab(state: HoldingsState) {
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            "$${String.format("%.2f", state.totalValue)}",
+                            if (focusModeEnabled) "••••••" else "$${String.format("%.2f", state.totalValue)}",
                             style = MaterialTheme.typography.displayMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -135,7 +150,7 @@ fun HoldingsTab(state: HoldingsState) {
 
             // Holdings list
             items(state.holdings) { holding ->
-                HoldingCard(holding)
+                HoldingCard(holding, focusModeEnabled)
             }
 
             // Error message
@@ -152,7 +167,7 @@ fun HoldingsTab(state: HoldingsState) {
 }
 
 @Composable
-fun HoldingCard(holding: PortfolioHolding) {
+fun HoldingCard(holding: PortfolioHolding, focusModeEnabled: Boolean) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
@@ -189,7 +204,7 @@ fun HoldingCard(holding: PortfolioHolding) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Value", style = MaterialTheme.typography.bodySmall)
                     Text(
-                        "$${String.format("%.2f", holding.currentValue)}",
+                        if (focusModeEnabled) "••••••" else "$${String.format("%.2f", holding.currentValue)}",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -203,7 +218,7 @@ fun HoldingCard(holding: PortfolioHolding) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    "Price: $${String.format("%.2f", holding.currentPrice)}",
+                    if (focusModeEnabled) "Price: ••••••" else "Price: $${String.format("%.2f", holding.currentPrice)}",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
@@ -219,7 +234,7 @@ fun HoldingCard(holding: PortfolioHolding) {
  * Performance Tab - Shows P&L and performance metrics
  */
 @Composable
-fun PerformanceTab(state: PerformanceState, viewModel: PortfolioViewModel) {
+fun PerformanceTab(state: PerformanceState, viewModel: PortfolioViewModel, focusModeEnabled: Boolean) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -243,13 +258,13 @@ fun PerformanceTab(state: PerformanceState, viewModel: PortfolioViewModel) {
 
         // Metrics cards
         item {
-            MetricCard("Total Return", "$${String.format("%.2f", state.totalReturn)}")
+            MetricCard("Total Return", if (focusModeEnabled) "••••••" else "$${String.format("%.2f", state.totalReturn)}")
         }
         item {
             MetricCard("ROI", "${String.format("%.2f", state.roi)}%")
         }
         item {
-            MetricCard("Daily P&L", "$${String.format("%.2f", state.dailyPnL)}")
+            MetricCard("Daily P&L", if (focusModeEnabled) "••••••" else "$${String.format("%.2f", state.dailyPnL)}")
         }
 
         // Performance Chart
@@ -430,14 +445,14 @@ fun TradeCard(trade: Trade) {
  * Analytics Tab - Shows advanced metrics
  */
 @Composable
-fun AnalyticsTab(state: AnalyticsState) {
+fun AnalyticsTab(state: AnalyticsState, focusModeEnabled: Boolean) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { MetricCard("Sharpe Ratio", String.format("%.2f", state.sharpeRatio)) }
-        item { MetricCard("Max Drawdown", "$${String.format("%.2f", state.maxDrawdown)}") }
+        item { MetricCard("Max Drawdown", if (focusModeEnabled) "••••••" else "$${String.format("%.2f", state.maxDrawdown)}") }
         item { MetricCard("Win Rate", "${String.format("%.2f", state.winRate)}%") }
         item { MetricCard("Profit Factor", String.format("%.2f", state.profitFactor)) }
         item { MetricCard("Avg Hold Time", "${state.avgHoldTime / 1000 / 60 / 60}h") }
@@ -457,7 +472,7 @@ fun AnalyticsTab(state: AnalyticsState) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "${trade.pair}: $${String.format("%.2f", trade.profit ?: 0.0)}",
+                            if (focusModeEnabled) "${trade.pair}: ••••••" else "${trade.pair}: $${String.format("%.2f", trade.profit ?: 0.0)}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.profit
@@ -482,7 +497,7 @@ fun AnalyticsTab(state: AnalyticsState) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "${trade.pair}: $${String.format("%.2f", trade.profit ?: 0.0)}",
+                            if (focusModeEnabled) "${trade.pair}: ••••••" else "${trade.pair}: $${String.format("%.2f", trade.profit ?: 0.0)}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.loss
@@ -590,6 +605,15 @@ fun MetricCard(label: String, value: String) {
             )
         }
     }
+}
+
+/**
+ * Positions Tab - Shows active trading positions
+ * Uses PositionManagementScreen from standalone screen
+ */
+@Composable
+fun PositionsTab() {
+    com.cryptotrader.presentation.screens.positions.PositionManagementScreen()
 }
 
 fun formatTime(timestamp: Long?): String {
