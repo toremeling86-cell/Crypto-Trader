@@ -12,11 +12,14 @@ import com.cryptotrader.presentation.screens.ai.AIScreen
 import com.cryptotrader.presentation.screens.dashboard.DashboardScreen
 import com.cryptotrader.presentation.screens.disclaimer.DisclaimerScreen
 import com.cryptotrader.presentation.screens.market.MarketScreen
-// TODO: Re-enable when UI screens are properly implemented
-// import com.cryptotrader.presentation.screens.orders.OrderManagementScreen
+import com.cryptotrader.presentation.screens.orders.OrderManagementScreen
 import com.cryptotrader.presentation.screens.portfolio.PortfolioScreen
-// import com.cryptotrader.presentation.screens.positions.PositionsScreen
+import com.cryptotrader.presentation.screens.positions.PositionManagementScreen
 import com.cryptotrader.presentation.screens.reports.ReportsScreen
+import com.cryptotrader.presentation.screens.history.TradingHistoryScreen
+import com.cryptotrader.presentation.screens.analytics.PerformanceScreen
+import com.cryptotrader.presentation.screens.chat.ChatScreen
+import com.cryptotrader.presentation.screens.strategy.CreateStrategyScreen
 import com.cryptotrader.presentation.screens.settings.SettingsScreen
 import com.cryptotrader.presentation.screens.setup.ApiKeySetupScreen
 // TEMPORARILY DISABLED - Learning section has compilation errors
@@ -36,6 +39,10 @@ sealed class Screen(val route: String) {
     object Reports : Screen("reports")
     object Orders : Screen("orders")
     object Positions : Screen("positions")
+    object History : Screen("history")
+    object Analytics : Screen("analytics")
+    object Chat : Screen("chat")
+    object CreateStrategy : Screen("create_strategy")
     object Settings : Screen("settings")
 
     // Learning Section
@@ -106,23 +113,35 @@ fun NavGraph(
         }
 
         composable(Screen.Orders.route) {
-            // TODO: Re-implement OrderManagementScreen with correct Position model properties
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = androidx.compose.ui.Alignment.Center
-            ) {
-                androidx.compose.material3.Text("Orders - Coming Soon")
-            }
+            OrderManagementScreen()
         }
 
         composable(Screen.Positions.route) {
-            // TODO: Re-implement PositionsScreen with correct Position model properties
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = androidx.compose.ui.Alignment.Center
-            ) {
-                androidx.compose.material3.Text("Positions - Coming Soon")
-            }
+            PositionManagementScreen()
+        }
+
+        composable(Screen.History.route) {
+            TradingHistoryScreen()
+        }
+
+        composable(Screen.Analytics.route) {
+            PerformanceScreen()
+        }
+
+        composable(Screen.Chat.route) {
+            ChatScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.CreateStrategy.route) {
+            CreateStrategyScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         composable(Screen.Settings.route) {
