@@ -3,6 +3,7 @@ package com.cryptotrader.data.local.dao
 import androidx.room.*
 import com.cryptotrader.data.local.entities.PositionEntity
 import kotlinx.coroutines.flow.Flow
+import java.math.BigDecimal
 
 @Dao
 interface PositionDao {
@@ -14,6 +15,9 @@ interface PositionDao {
 
     @Query("SELECT * FROM positions WHERE id = :id")
     suspend fun getPositionById(id: String): PositionEntity?
+
+    @Query("SELECT * FROM positions WHERE id = :id")
+    fun getPositionByIdFlow(id: String): Flow<PositionEntity?>
 
     @Query("SELECT * FROM positions WHERE status = 'OPEN'")
     fun getOpenPositions(): Flow<List<PositionEntity>>
@@ -38,6 +42,30 @@ interface PositionDao {
 
     @Query("UPDATE positions SET unrealizedPnL = :pnl, unrealizedPnLPercent = :pnlPercent, lastUpdated = :time WHERE id = :id")
     suspend fun updateUnrealizedPnL(id: String, pnl: Double, pnlPercent: Double, time: Long)
+
+    /**
+     * Update unrealized P&L with BigDecimal precision and current price tracking
+     *
+     * @param positionId Position to update
+     * @param unrealizedPnLDecimal Unrealized P&L as BigDecimal
+     * @param unrealizedPnLPercentDecimal P&L percent as BigDecimal
+     * @param currentPrice Current market price
+     * @param lastUpdated Timestamp of the update
+     */
+    @Query("""
+        UPDATE positions
+        SET unrealizedPnLDecimal = :unrealizedPnLDecimal,
+            unrealizedPnLPercentDecimal = :unrealizedPnLPercentDecimal,
+            lastUpdated = :lastUpdated
+        WHERE id = :positionId
+    """)
+    suspend fun updateUnrealizedPnLDecimal(
+        positionId: String,
+        unrealizedPnLDecimal: BigDecimal,
+        unrealizedPnLPercentDecimal: BigDecimal,
+        currentPrice: BigDecimal,
+        lastUpdated: Long
+    )
 
     @Query("""
         UPDATE positions
@@ -86,4 +114,21 @@ interface PositionDao {
 
     @Query("DELETE FROM positions WHERE closedAt < :before AND status = 'CLOSED'")
     suspend fun deleteOldClosedPositions(before: Long): Int
+
+    /**
+     * Get count of open positions
+     *
+     * @return Count of positions with OPEN status
+     */
+    @Query("SELECT COUNT(*) FROM positions WHERE status = 'OPEN'")
+    fun getOpenPositionsCount(): Flow<Int>
+
+    /**
+     * Batch query for positions by pair with Flow support
+     *
+     * @param pair Trading pair to filter
+     * @return Flow of all positions for the pair
+     */
+    @Query("SELECT * FROM positions WHERE pair = :pair")
+    fun getPositionsByPairFlow(pair: String): Flow<List<PositionEntity>>
 }

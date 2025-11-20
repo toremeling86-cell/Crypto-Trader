@@ -1,0 +1,301 @@
+
+
+    // Advanced querying and analytics methods
+
+    /**
+     * Get trades within a date range
+     *
+     * @param startDate Start timestamp in milliseconds
+     * @param endDate End timestamp in milliseconds
+     * @return Flow emitting list of trades within the date range
+     */
+    fun getTradesByDateRange(startDate: Long, endDate: Long): Flow<List<Trade>> {
+        return tradeDao.getTradesBetween(startDate, endDate).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    /**
+     * Get trades filtered by P&L range
+     *
+     * @param minPnL Minimum P&L value
+     * @param maxPnL Maximum P&L value
+     * @return Flow emitting list of trades within P&L range
+     */
+    fun getTradesByPnLRange(minPnL: Double, maxPnL: Double): Flow<List<Trade>> {
+        return tradeDao.getTradesByPnLRange(minPnL, maxPnL).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    /**
+     * Get trades for multiple trading pairs
+     *
+     * @param pairs List of trading pairs (e.g., ["BTC/USD", "ETH/USD"])
+     * @return Flow emitting list of trades for specified pairs
+     */
+    fun getTradesByPairs(pairs: List<String>): Flow<List<Trade>> {
+        if (pairs.isEmpty()) {
+            return flowOf(emptyList())
+        }
+        return tradeDao.getTradesByPairs(pairs).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    /**
+     * Get recent trades with pagination
+     *
+     * @param limit Number of trades to return per page
+     * @param offset Number of trades to skip
+     * @return Flow emitting paginated list of recent trades
+     */
+    fun getRecentTradesPaged(limit: Int, offset: Int): Flow<List<Trade>> {
+        return tradeDao.getTradesPaged(limit, offset).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    /**
+     * Get trade count by strategy
+     *
+     * @return Map of strategy ID to trade count
+     */
+    suspend fun getTradeCountByStrategy(): Map<String, Int> {
+        return try {
+            tradeDao.getTradeCountByStrategy()
+        } catch (e: Exception) {
+            Timber.e(e, "Error getting trade count by strategy")
+            emptyMap()
+        }
+    }
+
+    /**
+     * Get average P&L per trading pair
+     *
+     * @return Flow emitting map of pair to average P&L
+     */
+    fun getAveragePnLByPair(): Flow<Map<String, BigDecimal>> = flow {
+        try {
+            val trades = tradeDao.getAllTradesForStatistics()
+
+            val avgPnLByPair = trades
+                .groupBy { it.pair }
+                .mapValues { (_, pairTrades) ->
+                    val pnlValues = pairTrades.mapNotNull {
+                        it.realizedPnL?.toBigDecimal() ?: it.profit?.toBigDecimal()
+                    }
+
+                    if (pnlValues.isNotEmpty()) {
+                        pnlValues.fold(BigDecimal.ZERO) { acc, pnl -> acc + pnl }
+                            .divide(BigDecimal(pnlValues.size), 8, RoundingMode.HALF_EVEN)
+                    } else {
+                        BigDecimal.ZERO
+                    }
+                }
+
+            emit(avgPnLByPair)
+        } catch (e: Exception) {
+            Timber.e(e, "Error calculating average P&L by pair")
+            emit(emptyMap())
+        }
+    }
+
+    /**
+     * Get total trading volume by pair
+     *
+     * @return Flow emitting map of pair to total volume
+     */
+    fun getTotalVolumeByPair(): Flow<Map<String, BigDecimal>> = flow {
+        try {
+            val trades = tradeDao.getAllTradesForStatistics()
+
+            val volumeByPair = trades
+                .groupBy { it.pair }
+                .mapValues { (_, pairTrades) ->
+                    pairTrades
+                        .mapNotNull { it.volumeDecimal }
+                        .fold(BigDecimal.ZERO) { acc, vol -> acc + vol }
+                }
+
+            emit(volumeByPair)
+        } catch (e: Exception) {
+            Timber.e(e, "Error calculating volume by pair")
+            emit(emptyMap())
+        }
+    }
+
+    /**
+     * Export trades to CSV format
+     *
+     * @param startDate Optional start date (milliseconds). If null, includes all trades from beginning
+     * @param endDate Optional end date (milliseconds). If null, includes all trades to now
+     * @return Result containing CSV string or error
+     */
+    suspend fun exportTradesToCsv(startDate: Long? = null, endDate: Long? = null): Result<String> {
+        return try {
+            val trades = if (startDate != null && endDate != null) {
+                tradeDao.getTradesBetween(startDate, endDate).let { flow ->
+                    val result = mutableListOf<com.cryptotrader.data.local.entities.TradeEntity>()
+                    flow.collect { result.addAll(it) }
+                    result
+                }
+            } else {
+                tradeDao.getAllTrades()
+            }
+
+            val csv = buildString {
+                appendLine("ID,Pair,Type,Quantity,Price,Cost,Fee,PnL,Executed At,Strategy,Status")
+                trades.forEach { trade ->
+                    val values = listOf(
+                        trade.id.toString(),
+                        escapeCsvField(trade.pair),
+                        trade.type,
+                        (trade.volumeDecimal?.toPlainString() ?: trade.volume.toString()),
+                        (trade.priceDecimal?.toPlainString() ?: trade.price.toString()),
+                        (trade.costDecimal?.toPlainString() ?: trade.cost.toString()),
+                        (trade.feeDecimal?.toPlainString() ?: trade.fee.toString()),
+                        (trade.realizedPnL?.toString() ?: trade.profit?.toString() ?: "0"),
+                        (trade.executedAt?.toString() ?: trade.timestamp.toString()),
+                        escapeCsvField(trade.strategyId ?: ""),
+                        trade.status
+                    )
+                    appendLine(values.joinToString(","))
+                }
+            }
+
+            Timber.i("Exported ${trades.size} trades to CSV (${csv.length} bytes)")
+            Result.success(csv)
+
+        } catch (e: Exception) {
+            Timber.e(e, "Error exporting trades to CSV")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Get comprehensive trade statistics
+     *
+     * @return Flow emitting aggregated trade statistics
+     */
+    fun getTradeStatistics(): Flow<com.cryptotrader.domain.model.TradeStatistics> = flow {
+        try {
+            val trades = tradeDao.getAllTradesForStatistics()
+
+            if (trades.isEmpty()) {
+                emit(com.cryptotrader.domain.model.TradeStatistics(
+                    totalTrades = 0,
+                    totalVolume = BigDecimal.ZERO,
+                    averagePnL = BigDecimal.ZERO,
+                    medianPnL = BigDecimal.ZERO,
+                    winningTrades = 0,
+                    losingTrades = 0,
+                    largestWin = BigDecimal.ZERO,
+                    largestLoss = BigDecimal.ZERO,
+                    averageTradeSize = BigDecimal.ZERO,
+                    mostTradedPair = null,
+                    totalUniquesPairs = 0,
+                    tradesByMonth = emptyMap()
+                ))
+                return@flow
+            }
+
+            val totalVolume = trades.sumOf { it.volumeDecimal ?: BigDecimal.ZERO }
+            val pnlValues = trades.mapNotNull { trade ->
+                (trade.realizedPnL ?: trade.profit)?.toBigDecimal()
+            }
+
+            val averagePnL = if (pnlValues.isNotEmpty()) {
+                pnlValues.fold(BigDecimal.ZERO) { acc, pnl -> acc + pnl }
+                    .divide(BigDecimal(pnlValues.size), 8, RoundingMode.HALF_EVEN)
+            } else {
+                BigDecimal.ZERO
+            }
+
+            val sortedPnL = pnlValues.sorted()
+            val medianPnL = if (sortedPnL.isNotEmpty()) {
+                sortedPnL[sortedPnL.size / 2]
+            } else {
+                BigDecimal.ZERO
+            }
+
+            val winningTrades = pnlValues.count { it > BigDecimal.ZERO }
+            val losingTrades = pnlValues.count { it < BigDecimal.ZERO }
+            val largestWin = pnlValues.maxOrNull() ?: BigDecimal.ZERO
+            val largestLoss = pnlValues.minOrNull() ?: BigDecimal.ZERO
+
+            val averageTradeSize = if (trades.isNotEmpty()) {
+                totalVolume.divide(
+                    BigDecimal(trades.size),
+                    8,
+                    RoundingMode.HALF_EVEN
+                )
+            } else {
+                BigDecimal.ZERO
+            }
+
+            val mostTradedPair = trades
+                .groupBy { it.pair }
+                .maxByOrNull { it.value.size }
+                ?.key
+
+            val uniquePairs = trades.map { it.pair }.distinct().size
+
+            val tradesByMonth = trades
+                .groupBy { trade ->
+                    val instant = java.time.Instant.ofEpochMilli(trade.executedAt ?: trade.timestamp)
+                    val zoneId = java.time.ZoneId.systemDefault()
+                    val zonedDate = instant.atZone(zoneId)
+                    "${zonedDate.year}-${zonedDate.monthValue.toString().padStart(2, '0')}"
+                }
+                .mapValues { it.value.size }
+
+            emit(com.cryptotrader.domain.model.TradeStatistics(
+                totalTrades = trades.size,
+                totalVolume = totalVolume,
+                averagePnL = averagePnL,
+                medianPnL = medianPnL,
+                winningTrades = winningTrades,
+                losingTrades = losingTrades,
+                largestWin = largestWin,
+                largestLoss = largestLoss,
+                averageTradeSize = averageTradeSize,
+                mostTradedPair = mostTradedPair,
+                totalUniquesPairs = uniquePairs,
+                tradesByMonth = tradesByMonth
+            ))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Error calculating trade statistics")
+            emit(com.cryptotrader.domain.model.TradeStatistics(
+                totalTrades = 0,
+                totalVolume = BigDecimal.ZERO,
+                averagePnL = BigDecimal.ZERO,
+                medianPnL = BigDecimal.ZERO,
+                winningTrades = 0,
+                losingTrades = 0,
+                largestWin = BigDecimal.ZERO,
+                largestLoss = BigDecimal.ZERO,
+                averageTradeSize = BigDecimal.ZERO,
+                mostTradedPair = null,
+                totalUniquesPairs = 0,
+                tradesByMonth = emptyMap()
+            ))
+        }
+    }
+
+    /**
+     * Escape special characters in CSV fields
+     * Wraps field in quotes if it contains comma, quote, or newline
+     *
+     * @param field The field value to escape
+     * @return Escaped field value suitable for CSV format
+     */
+    private fun escapeCsvField(field: String): String {
+        return if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
+            "\"${field.replace("\"", "\"\"")}\""
+        } else {
+            field
+        }
+    }
+}

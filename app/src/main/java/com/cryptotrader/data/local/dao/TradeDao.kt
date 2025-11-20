@@ -89,3 +89,70 @@ interface TradeDao {
     @Query("DELETE FROM trades WHERE executedAt < :before")
     suspend fun deleteTradesBefore(before: Long): Int
 }
+
+    // Advanced query methods for analytics
+    /**
+     * Get trades filtered by P&L range
+     * Uses realizedPnL field or calculates from profit
+     */
+    @Query("""
+        SELECT * FROM trades
+        WHERE (realizedPnL IS NOT NULL AND realizedPnL BETWEEN :minPnL AND :maxPnL)
+           OR (profit IS NOT NULL AND profit BETWEEN :minPnL AND :maxPnL)
+        ORDER BY executedAt DESC
+    """)
+    fun getTradesByPnLRange(minPnL: Double, maxPnL: Double): Flow<List<TradeEntity>>
+
+    /**
+     * Get trades by multiple trading pairs
+     */
+    @Query("SELECT * FROM trades WHERE pair IN (:pairs) ORDER BY executedAt DESC")
+    fun getTradesByPairs(pairs: List<String>): Flow<List<TradeEntity>>
+
+    /**
+     * Get recent trades with pagination support
+     */
+    @Query("SELECT * FROM trades ORDER BY executedAt DESC LIMIT :limit OFFSET :offset")
+    fun getTradesPaged(limit: Int, offset: Int): Flow<List<TradeEntity>>
+
+    /**
+     * Get trade count by strategy
+     */
+    @Query("""
+        SELECT strategyId, COUNT(*) as count
+        FROM trades
+        WHERE strategyId IS NOT NULL
+        GROUP BY strategyId
+    """)
+    suspend fun getTradeCountByStrategy(): Map<String, Int>
+
+    /**
+     * Get all distinct trading pairs
+     */
+    @Query("SELECT DISTINCT pair FROM trades ORDER BY pair ASC")
+    suspend fun getAllTradedPairs(): List<String>
+
+    /**
+     * Get total count of unique trading pairs
+     */
+    @Query("SELECT COUNT(DISTINCT pair) FROM trades")
+    suspend fun getUniquePairCount(): Int
+
+    /**
+     * Get the most traded pair (by count)
+     */
+    @Query("""
+        SELECT pair FROM trades
+        GROUP BY pair
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+    """)
+    suspend fun getMostTradedPair(): String?
+
+    /**
+     * Get trades for statistics calculation
+     * Returns all fields needed for comprehensive analytics
+     */
+    @Query("SELECT * FROM trades ORDER BY executedAt DESC")
+    suspend fun getAllTradesForStatistics(): List<TradeEntity>
+}

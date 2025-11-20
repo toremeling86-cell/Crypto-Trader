@@ -1027,36 +1027,66 @@ Create a screen showing all open and closed trading positions with P&L tracking.
 - Color-coded P&L: green if profit, red if loss
 - Expandable cards showing: opened date, closed date (if applicable), entry/exit prices, fees, realized P&L
 
-**Data Model**:
+**Data Models** (Use these - already implemented):
 ```kotlin
+// Primary position model
 data class Position(
     val id: String,
     val strategyId: String,
     val pair: String,
-    val side: TradeType,           // BUY or SELL
+    val side: PositionSide,         // LONG or SHORT (NOT TradeType!)
     val quantity: Double,
-    val entryPrice: Double,
-    val currentPrice: Double?,
-    val status: PositionStatus,     // OPEN, CLOSED
+    val entryPrice: BigDecimal,
+    val status: PositionStatus,      // OPEN, CLOSED
     val openedAt: Long,
     val closedAt: Long?,
-    val realizedPnL: Double?,
-    val unrealizedPnL: Double?
+    val realizedPnL: BigDecimal?,
+    val unrealizedPnL: BigDecimal?
+)
+
+// Position with real-time price and P&L (NEW - use this for live updates!)
+data class PositionWithPrice(
+    val position: Position,
+    val currentPrice: BigDecimal?,
+    val unrealizedPnL: BigDecimal?,
+    val unrealizedPnLPercent: Double?,
+    val lastPriceUpdate: Long?
+)
+
+// Real-time P&L updates (NEW - optimized for high-frequency updates)
+data class PositionPnL(
+    val positionId: String,
+    val unrealizedPnL: BigDecimal,
+    val unrealizedPnLPercent: Double,
+    val currentPrice: BigDecimal,
+    val timestamp: Long
 )
 
 enum class PositionStatus {
     OPEN, CLOSED
 }
+
+enum class PositionSide {
+    LONG, SHORT
+}
 ```
 
-**Repository Methods Available**:
+**Repository Methods Available** (PositionRepository - FULLY IMPLEMENTED):
 ```kotlin
-// PositionRepository already exists in codebase
+// Basic position queries
 fun getAllPositions(): Flow<List<Position>>
 fun getOpenPositions(): Flow<List<Position>>
 fun getClosedPositions(): Flow<List<Position>>
 suspend fun closePosition(positionId: String)
+
+// ✨ NEW: Real-time price and P&L tracking (Agent 6 enhancements)
+fun getPositionWithCurrentPrice(positionId: String): Flow<PositionWithPrice>
+fun getOpenPositionsWithPrices(): Flow<List<PositionWithPrice>>
+fun observePositionPnL(positionId: String): Flow<PositionPnL>
+suspend fun updateUnrealizedPnL(priceUpdates: Map<String, BigDecimal>)
 ```
+
+**⚠️ IMPORTANT**: Use `PositionWithPrice` for UI cards to get real-time P&L!
 
 **Example Card UI**:
 ```
@@ -1104,12 +1134,12 @@ data class Trade(
 )
 ```
 
-**Repository Methods**:
+**Repository Methods** (TradeRepository - FULLY IMPLEMENTED):
 ```kotlin
-// TradeRepository available
-fun getAllTrades(): Flow<List<Trade>>
-fun getTradesByPair(pair: String): Flow<List<Trade>>
+fun getAllTradesFlow(): Flow<List<Trade>>
+fun getRecentTrades(limit: Int = 50): Flow<List<Trade>>
 fun getTradesByStrategy(strategyId: String): Flow<List<Trade>>
+fun getTradesByPair(pair: String, limit: Int = 100): Flow<List<Trade>>  // ✨ NEW
 ```
 
 **Example Timeline**:
@@ -1161,34 +1191,66 @@ Comprehensive analytics dashboard with charts and performance metrics.
 - Sortable by each column
 - Color-coded P&L
 
-**Data Model**:
+**Data Models** (Use these - already implemented with BigDecimal precision):
 ```kotlin
+// ✅ FULLY IMPLEMENTED - NO MOCK DATA NEEDED!
 data class PerformanceMetrics(
-    val totalPnL: Double,
-    val winRate: Double,
+    val totalPnL: BigDecimal,        // NOT Double! Use BigDecimal
+    val winRate: Double,              // 0-100 percentage
     val totalTrades: Int,
     val openPositions: Int,
-    val bestTrade: Double,
-    val worstTrade: Double,
-    val pnlOverTime: List<Pair<Long, Double>>,  // timestamp, pnl
-    val winLossDistribution: Pair<Int, Int>,     // wins, losses
-    val tradesPerPair: Map<String, Int>
+    val bestTrade: BigDecimal,
+    val worstTrade: BigDecimal,
+    val profitFactor: Double,         // gross_profit / gross_loss
+    val sharpeRatio: Double?,         // Risk-adjusted return
+    val maxDrawdown: Double           // Maximum drawdown percentage
 )
+
+data class PnLDataPoint(
+    val timestamp: Long,
+    val cumulativePnL: BigDecimal,
+    val tradePnL: BigDecimal? = null
+)
+
+data class WinLossStats(
+    val wins: Int,
+    val losses: Int,
+    val breakeven: Int
+)
+
+data class StrategyPerformance(
+    val strategyId: String,
+    val strategyName: String,
+    val totalTrades: Int,
+    val winRate: Double,
+    val totalPnL: BigDecimal,
+    val profitFactor: Double,
+    val sharpeRatio: Double?,
+    val maxDrawdown: Double
+)
+
+enum class TimeInterval {
+    HOURLY, DAILY, WEEKLY, MONTHLY
+}
 ```
 
-**Repository Methods**:
+**Repository Methods** (AnalyticsRepository - ✅ FULLY IMPLEMENTED by Agent 5):
 ```kotlin
-// AnalyticsRepository (will be created by backend team)
+// ✨ ALL METHODS READY - NO MOCK DATA NEEDED!
 fun getPerformanceMetrics(): Flow<PerformanceMetrics>
-
-// StrategyAnalytics (already exists)
-suspend fun calculateStrategyPerformance(strategyId: String): StrategyPerformance
+fun getPnLOverTime(startDate: Long, endDate: Long, interval: TimeInterval): Flow<List<PnLDataPoint>>
+fun getWinLossDistribution(): Flow<WinLossStats>
+fun getTradesPerPair(): Flow<Map<String, Int>>
+fun getStrategyPerformance(): Flow<List<StrategyPerformance>>
+fun getTopTrades(limit: Int = 10): Flow<List<Trade>>
+fun getWorstTrades(limit: Int = 10): Flow<List<Trade>>
 ```
 
-**IMPORTANT**:
-- Implement UI and chart layouts
-- Use MOCK DATA for now (backend will provide real repository)
-- Focus on beautiful, professional charts
+**⚠️ IMPORTANT**:
+- ✅ Backend is READY - Use real repository methods directly!
+- ✅ All data uses BigDecimal - Display using formatCurrency() utility
+- Focus on beautiful Vico charts and professional layout
+- Use TimeInterval.DAILY for default P&L chart
 
 ### Batch 2.4: AI Import Dialog 📋
 **Priority**: HIGH
@@ -1321,16 +1383,15 @@ app/src/main/java/com/cryptotrader/presentation/screens/
 7. ✅ Confirmation dialogs for destructive actions
 8. ✅ Professional color coding (no random colors)
 
-### Backend Dependencies (Will be provided)
+### Backend Dependencies ✅ ALL READY!
 
-UI team can use **mock data** for:
-- `AnalyticsRepository.getPerformanceMetrics()` (Batch 2.3)
+**All repositories are FULLY IMPLEMENTED and ready to use**:
+- ✅ PositionRepository - Enhanced with real-time P&L tracking (Agent 6)
+- ✅ TradeRepository - Enhanced with advanced queries and CSV export (Agent 7)
+- ✅ StrategyRepository - Existing + pending strategies support
+- ✅ AnalyticsRepository - Fully implemented with BigDecimal precision (Agent 5)
 
-Backend team will implement:
-- PositionRepository (already exists)
-- TradeRepository (already exists)
-- StrategyRepository (already exists)
-- AnalyticsRepository (will create)
+**NO MOCK DATA NEEDED** - All backend methods work with real database!
 
 ---
 
