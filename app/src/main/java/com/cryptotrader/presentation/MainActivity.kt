@@ -96,6 +96,7 @@ fun BottomNavigationBar(
     onNavigate: (String) -> Unit
 ) {
     NavigationBar {
+        // 1. Dashboard (Home)
         NavigationBarItem(
             selected = currentRoute == Screen.Dashboard.route,
             onClick = { onNavigate(Screen.Dashboard.route) },
@@ -103,46 +104,40 @@ fun BottomNavigationBar(
             label = { Text("Home", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             alwaysShowLabel = false
         )
+
+        // 2. Positions
         NavigationBarItem(
-            selected = currentRoute == Screen.Market.route,
-            onClick = { onNavigate(Screen.Market.route) },
-            icon = { Icon(Icons.Default.ShowChart, contentDescription = null) },
-            label = { Text("Market", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            alwaysShowLabel = false
-        )
-        NavigationBarItem(
-            selected = currentRoute == Screen.AI.route,
-            onClick = { onNavigate(Screen.AI.route) },
-            icon = { Icon(Icons.Default.SmartToy, contentDescription = null) },
-            label = { Text("AI", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            alwaysShowLabel = false
-        )
-        // TEMPORARILY DISABLED - Learning section has compilation errors
-        /*
-        NavigationBarItem(
-            selected = currentRoute == Screen.Learning.route ||
-                       currentRoute == Screen.Library.route ||
-                       currentRoute == Screen.KnowledgeBase.route ||
-                       currentRoute?.startsWith("book_detail/") == true ||
-                       currentRoute?.startsWith("study_plan/") == true,
-            onClick = { onNavigate(Screen.Learning.route) },
-            icon = { Icon(Icons.Default.School, contentDescription = null) },
-            label = { Text("Learn", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            alwaysShowLabel = false
-        )
-        */
-        NavigationBarItem(
-            selected = currentRoute == Screen.Portfolio.route,
-            onClick = { onNavigate(Screen.Portfolio.route) },
+            selected = currentRoute == Screen.Positions.route,
+            onClick = { onNavigate(Screen.Positions.route) },
             icon = { Icon(Icons.Default.PieChart, contentDescription = null) },
-            label = { Text("Portfolio", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            label = { Text("Positions", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             alwaysShowLabel = false
         )
+
+        // 3. Analytics
         NavigationBarItem(
-            selected = currentRoute == Screen.Settings.route,
-            onClick = { onNavigate(Screen.Settings.route) },
-            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-            label = { Text("Settings", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            selected = currentRoute == Screen.Analytics.route,
+            onClick = { onNavigate(Screen.Analytics.route) },
+            icon = { Icon(Icons.Default.ShowChart, contentDescription = null) },
+            label = { Text("Analytics", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
+        )
+
+        // 4. Strategies (Reports = Strategy Config)
+        NavigationBarItem(
+            selected = currentRoute == Screen.Reports.route,
+            onClick = { onNavigate(Screen.Reports.route) },
+            icon = { Icon(Icons.Default.Description, contentDescription = null) },
+            label = { Text("Strategies", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            alwaysShowLabel = false
+        )
+
+        // 5. AI Chat
+        NavigationBarItem(
+            selected = currentRoute == Screen.Chat.route,
+            onClick = { onNavigate(Screen.Chat.route) },
+            icon = { Icon(Icons.Default.Chat, contentDescription = null) },
+            label = { Text("AI Chat", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             alwaysShowLabel = false
         )
     }

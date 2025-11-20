@@ -8,6 +8,7 @@ import com.cryptotrader.data.local.dao.ExpertReportDao
 import com.cryptotrader.data.local.dao.MarketCorrelationDao
 import com.cryptotrader.data.local.dao.MarketSnapshotDao
 import com.cryptotrader.data.local.dao.PortfolioSnapshotDao
+import com.cryptotrader.data.local.dao.PositionDao
 import com.cryptotrader.data.local.dao.StrategyDao
 import com.cryptotrader.data.local.dao.TradeDao
 import dagger.Module
@@ -56,6 +57,12 @@ object DatabaseModule {
     @Singleton
     fun provideOrderDao(database: AppDatabase): com.cryptotrader.data.local.dao.OrderDao {
         return database.orderDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePositionDao(database: AppDatabase): PositionDao {
+        return database.positionDao()
     }
 
     @Provides

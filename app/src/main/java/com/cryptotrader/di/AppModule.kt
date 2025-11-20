@@ -7,6 +7,8 @@ import com.cryptotrader.data.local.dao.StrategyDao
 import com.cryptotrader.data.local.dao.TradeDao
 import com.cryptotrader.data.repository.AIAdvisorRepository
 import com.cryptotrader.data.repository.AIAdvisorRepositoryImpl
+import com.cryptotrader.data.repository.AnalyticsRepository
+import com.cryptotrader.data.repository.AnalyticsRepositoryImpl
 import com.cryptotrader.data.repository.CryptoReportRepository
 import com.cryptotrader.data.repository.CryptoReportRepositoryImpl
 import com.cryptotrader.data.repository.MetaAnalysisRepository
@@ -51,4 +53,10 @@ abstract class RepositoryModule {
     abstract fun bindMetaAnalysisRepository(
         impl: MetaAnalysisRepositoryImpl
     ): MetaAnalysisRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAnalyticsRepository(
+        impl: AnalyticsRepositoryImpl
+    ): AnalyticsRepository
 }
