@@ -2,6 +2,7 @@ package com.cryptotrader.presentation.screens.analytics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cryptotrader.data.repository.PortfolioRepository
 import com.cryptotrader.data.repository.StrategyRepository
 import com.cryptotrader.domain.analytics.PerformanceCalculator
 import com.cryptotrader.domain.analytics.StrategyAnalytics
@@ -19,12 +20,7 @@ class PerformanceViewModel @Inject constructor(
     private val performanceCalculator: PerformanceCalculator,
     private val strategyAnalytics: StrategyAnalytics,
     private val strategyRepository: StrategyRepository,
-    // Assuming we have a repository to get portfolio snapshots, if not we might need to inject DAO directly or use a different repo
-    // For now, let's assume we can get snapshots via a repository or we mock it if the repo doesn't exist yet in the prompt context
-    // Looking at previous context, PortfolioRepository likely exists or similar.
-    // Let's use a placeholder flow for snapshots if a dedicated repo isn't clear, or try to find PortfolioRepository.
-    // Based on file structure, let's assume we can get snapshots.
-    private val portfolioRepository: com.cryptotrader.data.repository.PortfolioRepository 
+    private val portfolioRepository: PortfolioRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PerformanceState())
