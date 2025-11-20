@@ -2,25 +2,26 @@ package com.cryptotrader.presentation.screens.analytics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cryptotrader.data.repository.PortfolioRepository
-import com.cryptotrader.data.repository.StrategyRepository
-import com.cryptotrader.domain.analytics.PerformanceCalculator
-import com.cryptotrader.domain.analytics.StrategyAnalytics
-import com.cryptotrader.domain.analytics.StrategyPerformance
-import com.cryptotrader.domain.model.PerformanceMetrics
-import com.cryptotrader.domain.model.PortfolioSnapshot
+import com.cryptotrader.data.repository.AnalyticsRepository
+import com.cryptotrader.data.repository.PerformanceMetrics
+import com.cryptotrader.data.repository.StrategyPerformance
+import com.cryptotrader.data.repository.TimeInterval
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.math.BigDecimal
 import javax.inject.Inject
 
+/**
+ * ViewModel for Performance Analytics Dashboard
+ *
+ * Uses the new AnalyticsRepository (Agent 5) for comprehensive performance metrics.
+ * All calculations are performed with BigDecimal precision for hedge-fund quality.
+ */
 @HiltViewModel
 class PerformanceViewModel @Inject constructor(
-    private val performanceCalculator: PerformanceCalculator,
-    private val strategyAnalytics: StrategyAnalytics,
-    private val strategyRepository: StrategyRepository,
-    private val portfolioRepository: PortfolioRepository
+    private val analyticsRepository: AnalyticsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PerformanceState())
@@ -34,47 +35,43 @@ class PerformanceViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                // 1. Load Portfolio Performance Metrics
-                val snapshots = portfolioRepository.getPortfolioHistory().first() // Assuming this returns List<PortfolioSnapshot>
-                val metrics = performanceCalculator.calculatePerformanceDecimal(snapshots)
+                // 1. Load Performance Metrics
+                val metrics = analyticsRepository.getPerformanceMetrics().first()
                 
                 // 2. Load Strategy Performance
-                val strategies = strategyRepository.getAllStrategies().first()
-                val strategyPerformances = strategies.map { strategy ->
-                    val perf = strategyAnalytics.calculateStrategyPerformance(strategy.id)
-                    strategy.name to perf
-                }.toMap()
-
-                // 3. Prepare Chart Data (P&L over time)
-                val pnlChartData = snapshots.map { snapshot ->
-                    snapshot.timestamp to snapshot.totalPnLDecimal.toDouble()
+                val strategyPerformances = analyticsRepository.getStrategyPerformance().first()
+                val strategyPerfMap = strategyPerformances.associateBy { it.strategyName }
+                
+                // 3. Load P&L Chart Data
+                val now = System.currentTimeMillis()
+                val thirtyDaysAgo = now - (30L * 24 * 60 * 60 * 1000)
+                val pnlDataPoints = analyticsRepository.getPnLOverTime(
+                    startDate = thirtyDaysAgo,
+                    endDate = now,
+                    interval = com.cryptotrader.data.repository.TimeInterval.DAILY
+                ).first()
+                
+                val pnlChartData = pnlDataPoints.map { 
+                    it.timestamp to it.cumulativePnL.toDouble() 
                 }
-
-                // 4. Prepare Win/Loss Distribution
-                // We need to aggregate trades from all strategies or get global trade stats
-                // For simplicity, let's aggregate from strategy performances
-                var totalWins = 0
-                var totalLosses = 0
-                strategyPerformances.values.forEach { 
-                    totalWins += it.winningTrades
-                    totalLosses += it.losingTrades
-                }
-
-                // 5. Trades per Pair
-                // This would require querying all trades. Let's assume we can get this from a repository or aggregate.
-                // For now, we'll leave it empty or implement if we have a TradeRepository.
-                // Let's skip detailed trades-per-pair for this MVP step to avoid over-fetching.
+                
+                // 4. Load Win/Loss Distribution
+                val winLossStats = analyticsRepository.getWinLossDistribution().first()
+                
+                // 5. Load Trades per Pair
+                val tradesPerPair = analyticsRepository.getTradesPerPair().first()
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     performanceMetrics = metrics,
-                    strategyPerformances = strategyPerformances,
+                    strategyPerformances = strategyPerfMap,
                     pnlChartData = pnlChartData,
-                    winLossDistribution = totalWins to totalLosses,
-                    bestTrade = strategyPerformances.values.maxOfOrNull { it.bestTrade } ?: 0.0,
-                    worstTrade = strategyPerformances.values.minOfOrNull { it.worstTrade } ?: 0.0,
-                    totalTrades = totalWins + totalLosses,
-                    activePositions = 0 // TODO: Get from PositionRepository if needed
+                    winLossDistribution = winLossStats.wins to winLossStats.losses,
+                    bestTrade = metrics.bestTrade.toDouble(),
+                    worstTrade = metrics.worstTrade.toDouble(),
+                    totalTrades = metrics.totalTrades,
+                    activePositions = metrics.openPositions,
+                    tradesPerPair = tradesPerPair
                 )
 
             } catch (e: Exception) {
@@ -86,12 +83,17 @@ class PerformanceViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun refreshData() {
         loadPerformanceData()
     }
 }
 
+/**
+ * UI State for Performance Analytics Screen
+ *
+ * All monetary values use BigDecimal for exact precision.
+ */
 data class PerformanceState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
@@ -102,5 +104,6 @@ data class PerformanceState(
     val bestTrade: Double = 0.0,
     val worstTrade: Double = 0.0,
     val totalTrades: Int = 0,
-    val activePositions: Int = 0
+    val activePositions: Int = 0,
+    val tradesPerPair: Map<String, Int> = emptyMap()
 )

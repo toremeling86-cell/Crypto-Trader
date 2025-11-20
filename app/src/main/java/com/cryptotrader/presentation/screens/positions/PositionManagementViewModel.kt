@@ -21,6 +21,7 @@ class PositionManagementViewModel @Inject constructor(
 
     // Filters
     private val _filterStatus = MutableStateFlow<PositionFilter>(PositionFilter.OPEN)
+    val currentFilter: StateFlow<PositionFilter> = _filterStatus.asStateFlow() // Expose for UI
     private val _searchQuery = MutableStateFlow("")
 
     // Combine flows to get the displayed positions

@@ -397,7 +397,9 @@ fun DashboardScreen(
                             text = "EMERGENCY STOP",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Visible
                         )
                     }
                 }

@@ -14,7 +14,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.cryptotrader.data.repository.StrategyPerformance
 import com.cryptotrader.utils.formatCurrency
+import java.math.BigDecimal
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,16 +78,16 @@ fun PerformanceScreen(
                     ) {
                         MetricCard(
                             title = "Total P&L",
-                            value = state.performanceMetrics?.totalReturn?.formatCurrency() ?: "$0.00",
-                            subtitle = "${String.format("%.2f", state.performanceMetrics?.totalReturnPercent ?: 0.0)}%",
-                            isPositive = (state.performanceMetrics?.totalReturn ?: 0.0) >= 0,
+                            value = state.performanceMetrics?.totalPnL?.let { it.formatCurrency() } ?: "$0.00",
+                            subtitle = "${state.totalTrades} trades",
+                            isPositive = state.performanceMetrics?.totalPnL?.let { it >= BigDecimal.ZERO } ?: false,
                             modifier = Modifier.weight(1f)
                         )
                         MetricCard(
                             title = "Win Rate",
-                            value = "${String.format("%.1f", calculateOverallWinRate(state))}%",
-                            subtitle = "${state.totalTrades} trades",
-                            isPositive = calculateOverallWinRate(state) >= 50.0,
+                            value = "${String.format("%.1f", state.performanceMetrics?.winRate ?: 0.0)}%",
+                            subtitle = "${state.activePositions} open",
+                            isPositive = (state.performanceMetrics?.winRate ?: 0.0) >= 50.0,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -119,17 +121,17 @@ fun PerformanceScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         MetricCard(
-                            title = "ROI",
-                            value = "${String.format("%.2f", state.performanceMetrics?.roi ?: 0.0)}%",
-                            subtitle = "Return on investment",
-                            isPositive = (state.performanceMetrics?.roi ?: 0.0) >= 0,
+                            title = "Profit Factor",
+                            value = String.format("%.2f", state.performanceMetrics?.profitFactor ?: 0.0),
+                            subtitle = "Profit/Loss ratio",
+                            isPositive = (state.performanceMetrics?.profitFactor ?: 0.0) >= 1.0,
                             modifier = Modifier.weight(1f)
                         )
                         MetricCard(
-                            title = "Daily P&L",
-                            value = state.performanceMetrics?.dailyPnL?.formatCurrency() ?: "$0.00",
-                            subtitle = "${String.format("%.2f", state.performanceMetrics?.dailyPnLPercent ?: 0.0)}%",
-                            isPositive = (state.performanceMetrics?.dailyPnL ?: 0.0) >= 0,
+                            title = "Max Drawdown",
+                            value = "${String.format("%.2f", state.performanceMetrics?.maxDrawdown ?: 0.0)}%",
+                            subtitle = "Peak to trough",
+                            isPositive = false,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -322,7 +324,7 @@ fun MetricCard(
 @Composable
 fun StrategyPerformanceCard(
     strategyName: String,
-    performance: com.cryptotrader.domain.analytics.StrategyPerformance
+    performance: StrategyPerformance
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -337,7 +339,7 @@ fun StrategyPerformanceCard(
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -352,7 +354,7 @@ fun StrategyPerformanceCard(
                         performance.totalPnL.formatCurrency(),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = if (performance.totalPnL >= 0) Color(0xFF4CAF50) else Color(0xFFE57373)
+                        color = if (performance.totalPnL >= BigDecimal.ZERO) Color(0xFF4CAF50) else Color(0xFFE57373)
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
@@ -364,10 +366,3 @@ fun StrategyPerformanceCard(
     }
 }
 
-private fun calculateOverallWinRate(state: PerformanceState): Double {
-    val totalWins = state.winLossDistribution.first
-    val totalTrades = state.totalTrades
-    return if (totalTrades > 0) {
-        (totalWins.toDouble() / totalTrades.toDouble()) * 100.0
-    } else 0.0
-}

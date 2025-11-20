@@ -30,6 +30,7 @@ fun PositionManagementScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val positions by viewModel.positions.collectAsState()
+    val currentFilter by viewModel.currentFilter.collectAsState() // Collect current filter
     var showFilterSheet by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -90,22 +91,28 @@ fun PositionManagementScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
-                        selected = true, // We need to expose current filter from VM to make this dynamic
+                        selected = currentFilter == PositionFilter.OPEN,
                         onClick = { viewModel.setFilter(PositionFilter.OPEN) },
                         label = { Text("Open") },
-                        leadingIcon = if (true) { // Placeholder for selection state
+                        leadingIcon = if (currentFilter == PositionFilter.OPEN) {
                             { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
                         } else null
                     )
                     FilterChip(
-                        selected = false,
+                        selected = currentFilter == PositionFilter.CLOSED,
                         onClick = { viewModel.setFilter(PositionFilter.CLOSED) },
-                        label = { Text("Closed") }
+                        label = { Text("Closed") },
+                        leadingIcon = if (currentFilter == PositionFilter.CLOSED) {
+                            { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
+                        } else null
                     )
                     FilterChip(
-                        selected = false,
+                        selected = currentFilter == PositionFilter.ALL,
                         onClick = { viewModel.setFilter(PositionFilter.ALL) },
-                        label = { Text("All") }
+                        label = { Text("All") },
+                        leadingIcon = if (currentFilter == PositionFilter.ALL) {
+                            { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
+                        } else null
                     )
                 }
             }
